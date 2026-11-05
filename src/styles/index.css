@@ -6,3 +6,69 @@
   color-scheme: dark;
 }
 
+/* Native desktop resets */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #111315;
+  color: #F3F4F6;
+  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Allow text selection in preview and content reading areas */
+.selectable-text {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Subtle desktop scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #747C86;
+}
+
+/* Text highlight */
+::selection {
+  background-color: rgba(139, 156, 247, 0.28);
+  color: #F3F4F6;
+}
+
+/* Accessible focus outline */
+:focus-visible {
+  outline: 2px solid #8B9CF7;
+  outline-offset: 1px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
