@@ -1,12 +1,81 @@
+import React, { useEffect } from 'react';
+import { ToastProvider, AppProvider, useApp } from '@/context';
+import { MainLayout, AppFooter } from '@/components/layout';
+import { PreviewPanel } from '@/components/preview';
+import { QuickAccessOverlay } from '@/components/quick-access';
+import { useDesktopShortcuts } from '@/hooks';
+import { AllItemsView } from '@/pages/AllItemsView';
+import { ClipboardView } from '@/pages/ClipboardView';
+import { ScreenshotsView } from '@/pages/ScreenshotsView';
+import { PinnedView } from '@/pages/PinnedView';
+import { FavoritesView } from '@/pages/FavoritesView';
+import { SettingsView } from '@/pages/SettingsView';
+
+const AppContent: React.FC = () => {
+  const { activeSection, setIsSidebarCollapsed, setIsPreviewVisible } = useApp();
+
+  // Initialize global desktop keyboard shortcuts
+  useDesktopShortcuts();
+
+  // Responsive desktop window resize listener for standard Windows resolutions
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      // Below 1280px width, collapse preview panel initially to prevent horizontal crunch
+      if (width < 1200) {
+        setIsPreviewVisible(false);
+      }
+      // Below 960px width, collapse sidebar
+      if (width < 960) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setIsSidebarCollapsed, setIsPreviewVisible]);
+
+  const renderActiveView = () => {
+    switch (activeSection) {
+      case 'all':
+        return <AllItemsView />;
+      case 'clipboard':
+        return <ClipboardView />;
+      case 'screenshots':
+        return <ScreenshotsView />;
+      case 'pinned':
+        return <PinnedView />;
+      case 'favorites':
+        return <FavoritesView />;
+      case 'settings':
+        return <SettingsView />;
+      default:
+        return <AllItemsView />;
+    }
+  };
+
+  return (
+    <>
+      <MainLayout
+        previewPanel={activeSection !== 'settings' ? <PreviewPanel /> : undefined}
+        footer={<AppFooter />}
+      >
+        {renderActiveView()}
+      </MainLayout>
+
+      {/* Floating Quick Access Overlay */}
+      <QuickAccessOverlay />
+    </>
+  );
+};
+
 export default function App() {
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#111315] text-[#F3F4F6]">
-      <div className="text-center">
-        <h1 className="text-xl font-semibold tracking-tight">LucidClip</h1>
-        <p className="mt-1 text-xs text-[#A1A7B0]">
-          Desktop Clipboard & Screenshot History
-        </p>
-      </div>
-    </div>
+    <ToastProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ToastProvider>
   );
 }
