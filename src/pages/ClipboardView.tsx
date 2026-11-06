@@ -3,6 +3,7 @@ import { useApp } from '@/context';
 import { SectionHeader, EmptyState, Badge, Button, SearchInput } from '@/components/ui';
 import { SearchEmptyState, SortDropdown } from '@/components/search';
 import { ClipboardRow } from '@/components/clipboard/ClipboardRow';
+import { ClipboardToolbar } from '@/components/clipboard/ClipboardToolbar';
 import { useListKeyboardNavigation } from '@/hooks';
 import { ClipboardList, Trash2 } from 'lucide-react';
 import { ClipboardContentType } from '@/types';
@@ -75,6 +76,8 @@ export const ClipboardView: React.FC = () => {
         }
         actions={
           <div className="flex items-center gap-2">
+            <ClipboardToolbar onRefresh={() => {}} />
+            <div className="h-4 w-[1px] bg-graphite-border mx-0.5" />
             <SortDropdown
               sortOrder={sortOrder}
               onSortChange={setSortOrder}
