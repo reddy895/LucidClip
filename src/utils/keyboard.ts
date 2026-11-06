@@ -33,3 +33,4 @@ export function formatShortcutDisplay(shortcut: string): string {
     })
     .join(' + ');
 }
+

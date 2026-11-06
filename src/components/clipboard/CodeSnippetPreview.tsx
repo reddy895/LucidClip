@@ -50,3 +50,4 @@ export const CodeSnippetPreview: React.FC<CodeSnippetPreviewProps> = ({
     </div>
   );
 };
+

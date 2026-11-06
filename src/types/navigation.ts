@@ -12,3 +12,4 @@ export type NavigationSection =
 export type HistoryItem =
   | ({ kind: 'clipboard' } & ClipboardEntry)
   | ({ kind: 'screenshot' } & ScreenshotEntry);
+

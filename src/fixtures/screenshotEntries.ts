@@ -159,3 +159,4 @@ export const INITIAL_SCREENSHOT_ENTRIES: ScreenshotEntry[] = [
     createdAt: daysAgo(2),
   },
 ];
+

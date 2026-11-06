@@ -76,3 +76,4 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
     </div>
   );
 };
+

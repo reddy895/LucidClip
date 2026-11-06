@@ -118,3 +118,4 @@ export const FavoritesView: React.FC = () => {
     </div>
   );
 };
+

@@ -10,3 +10,4 @@ export interface IClipboardService {
   clearHistory(): Promise<void>;
   addEntry(content: string, sourceApp?: string): Promise<ClipboardEntry>;
 }
+

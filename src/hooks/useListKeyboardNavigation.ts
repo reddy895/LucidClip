@@ -67,3 +67,4 @@ export function useListKeyboardNavigation({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [items, selectedItem, enabled, setSelectedItem, copyItem, togglePin, deleteItem]);
 }
+

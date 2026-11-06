@@ -10,3 +10,4 @@ export interface IScreenshotService {
   copyImageToClipboard(id: string): Promise<boolean>;
   exportScreenshot(id: string, destinationPath?: string): Promise<boolean>;
 }
+

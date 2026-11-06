@@ -72,3 +72,4 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
 
   return content;
 };
+

@@ -24,3 +24,4 @@ export const PreviewPanel: React.FC = () => {
 
   return <ScreenshotPreview screenshot={selectedItem} />;
 };
+

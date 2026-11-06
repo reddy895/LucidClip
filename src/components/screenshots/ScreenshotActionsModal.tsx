@@ -94,3 +94,4 @@ export const ScreenshotActionsModal: React.FC<ScreenshotActionsModalProps> = ({
     </>
   );
 };
+

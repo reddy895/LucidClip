@@ -38,3 +38,4 @@ export const UrlPreview: React.FC<UrlPreviewProps> = ({ url }) => {
     </div>
   );
 };
+

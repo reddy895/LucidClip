@@ -77,3 +77,4 @@ export function detectContentType(text: string): {
 
   return { type: 'text' };
 }
+

@@ -14,3 +14,4 @@ export const DateGroupSeparator: React.FC<DateGroupSeparatorProps> = ({ label })
     </div>
   );
 };
+

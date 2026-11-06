@@ -54,3 +54,4 @@ export const AppFooter: React.FC = () => {
     </footer>
   );
 };
+

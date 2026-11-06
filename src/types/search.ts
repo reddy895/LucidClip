@@ -8,3 +8,4 @@ export interface SearchQuery {
   onlyPinned?: boolean;
   onlyFavorites?: boolean;
 }
+

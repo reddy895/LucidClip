@@ -41,3 +41,4 @@ export interface AppSettings {
   shortcuts: ShortcutSettings;
   privacy: PrivacySettings;
 }
+

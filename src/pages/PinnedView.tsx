@@ -98,3 +98,4 @@ export const PinnedView: React.FC = () => {
     </div>
   );
 };
+

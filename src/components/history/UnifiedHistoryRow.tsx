@@ -235,3 +235,4 @@ export const UnifiedHistoryRow: React.FC<UnifiedHistoryRowProps> = ({
     </>
   );
 };
+

@@ -81,3 +81,4 @@ export class MockSearchService implements ISearchService {
 }
 
 export const searchService = new MockSearchService();
+

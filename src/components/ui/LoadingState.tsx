@@ -22,3 +22,4 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
     </div>
   );
 };
+

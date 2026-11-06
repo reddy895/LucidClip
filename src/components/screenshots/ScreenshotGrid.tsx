@@ -32,3 +32,4 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
     </div>
   );
 };
+

@@ -5,3 +5,4 @@ export interface ISettingsService {
   updateSettings(partial: Partial<AppSettings>): Promise<AppSettings>;
   resetToDefaults(): Promise<AppSettings>;
 }
+

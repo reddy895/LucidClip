@@ -21,3 +21,4 @@ export interface ScreenshotEntry {
   isFavorite: boolean;
   createdAt: string; // ISO 8601
 }
+

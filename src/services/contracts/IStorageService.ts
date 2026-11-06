@@ -8,3 +8,4 @@ export interface StorageStats {
 export interface IStorageService {
   getStorageUsage(): Promise<StorageStats>;
 }
+

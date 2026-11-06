@@ -160,3 +160,4 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
     </div>
   );
 };
+

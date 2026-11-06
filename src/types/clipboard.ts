@@ -15,3 +15,4 @@ export interface ClipboardEntry {
   createdAt: string; // ISO 8601
   updatedAt: string;
 }
+
