@@ -7,6 +7,7 @@ import { UnifiedHistoryRow } from '@/components/history/UnifiedHistoryRow';
 import { DateGroupSeparator } from '@/components/history/DateGroupSeparator';
 import { getDateGroup } from '@/utils';
 import { searchService } from '@/services';
+import { useListKeyboardNavigation } from '@/hooks';
 import { Clock } from 'lucide-react';
 
 export const AllItemsView: React.FC = () => {
@@ -53,6 +54,8 @@ export const AllItemsView: React.FC = () => {
       isCancelled = true;
     };
   }, [searchQuery, searchFilter, sortOrder, unifiedHistory, selectedItem, setSelectedItem]);
+
+  useListKeyboardNavigation({ items: filteredItems });
 
   if (isLoading) {
     return <LoadingState message="Loading your history..." />;
