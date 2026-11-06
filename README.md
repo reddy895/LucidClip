@@ -374,6 +374,30 @@ There is currently no public release installer.
 
 ---
 
+## Frontend Application & Development
+
+The LucidClip desktop frontend is built using React 18, TypeScript, Vite, and Tailwind CSS. It follows the graphite desktop design system specified in [DESIGN.md](docs/DESIGN.md).
+
+### Quickstart
+
+```bash
+# Install dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+
+# Run TypeScript typecheck
+npm run typecheck
+
+# Build desktop production assets
+npm run build
+```
+
+See [FRONTEND.md](docs/FRONTEND.md) for full architecture and design documentation.
+
+---
+
 ## Contributing
 
 LucidClip is intended to grow as an open-source project.
