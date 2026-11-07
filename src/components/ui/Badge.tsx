@@ -14,11 +14,11 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-medium rounded-badge transition-colors select-none shrink-0';
+    'inline-flex items-center justify-center font-medium rounded-badge transition-colors select-none shrink-0 tracking-tight font-tabular';
 
   const variants = {
     default:
-      'bg-graphite-surface-elevated text-graphite-text-secondary border border-graphite-border',
+      'bg-graphite-surface-elevated text-graphite-text-secondary border border-graphite-border/70',
     accent:
       'bg-accent-muted text-accent border border-accent-border font-semibold',
     success:

@@ -14,6 +14,8 @@ body {
   background-color: #111315;
   color: #F3F4F6;
   font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
   overflow: hidden;
@@ -28,6 +30,11 @@ body {
 .selectable-text {
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* Tabular figures for metadata, timestamps, and counts */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Subtle desktop scrollbar */
