@@ -4,3 +4,4 @@ export * from './ScreenshotsView';
 export * from './PinnedView';
 export * from './FavoritesView';
 export * from './SettingsView';
+
