@@ -2,6 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    lucidclip_lib::init();
-    println!("[LucidClip] LucidClip backend ready.");
+    lucidclip_lib::run();
 }
