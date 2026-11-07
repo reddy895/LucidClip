@@ -12,3 +12,14 @@ dist-ssr
 *.sln
 *.sw?
 
+# Rust & Tauri
+target/
+backend/target/
+.tauri/
+*.db
+*.db-wal
+*.db-shm
+screenshots/originals/
+screenshots/thumbnails/
+
+
