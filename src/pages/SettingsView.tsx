@@ -9,7 +9,7 @@ import {
   Badge,
   ConfirmationModal,
 } from '@/components/ui';
-import { SettingsSection } from '@/components/settings/SettingsSection';
+import { SettingsSection } from '@/components/settings';
 import {
   Sliders,
   ClipboardList,

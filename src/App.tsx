@@ -4,12 +4,14 @@ import { MainLayout, AppFooter } from '@/components/layout';
 import { PreviewPanel } from '@/components/preview';
 import { QuickAccessOverlay } from '@/components/quick-access';
 import { useDesktopShortcuts } from '@/hooks';
-import { AllItemsView } from '@/pages/AllItemsView';
-import { ClipboardView } from '@/pages/ClipboardView';
-import { ScreenshotsView } from '@/pages/ScreenshotsView';
-import { PinnedView } from '@/pages/PinnedView';
-import { FavoritesView } from '@/pages/FavoritesView';
-import { SettingsView } from '@/pages/SettingsView';
+import {
+  AllItemsView,
+  ClipboardView,
+  ScreenshotsView,
+  PinnedView,
+  FavoritesView,
+  SettingsView,
+} from '@/pages';
 
 const AppContent: React.FC = () => {
   const { activeSection, setIsSidebarCollapsed, setIsPreviewVisible } = useApp();
