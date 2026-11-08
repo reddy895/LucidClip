@@ -1,6 +1,5 @@
 import { IScreenshotService } from '../contracts';
 import { CaptureType, ScreenshotEntry } from '@/types';
-import { INITIAL_SCREENSHOT_ENTRIES } from '@/fixtures';
 
 const STORAGE_KEY = 'lucidclip_screenshot_history';
 
@@ -22,7 +21,8 @@ export class MockScreenshotService implements IScreenshotService {
       console.warn('Failed to parse screenshot history from localStorage', e);
     }
 
-    this.screenshots = [...INITIAL_SCREENSHOT_ENTRIES];
+    // Real data only: fresh installation produces a genuinely empty gallery
+    this.screenshots = [];
     this.save();
     this.isLoaded = true;
     return this.screenshots;

@@ -1,6 +1,5 @@
 import { IClipboardService } from '../contracts';
 import { ClipboardEntry } from '@/types';
-import { INITIAL_CLIPBOARD_ENTRIES } from '@/fixtures';
 import { copyTextToClipboard, detectContentType } from '@/utils';
 
 const STORAGE_KEY = 'lucidclip_clipboard_history';
@@ -23,7 +22,8 @@ export class MockClipboardService implements IClipboardService {
       console.warn('Failed to parse clipboard history from localStorage', e);
     }
 
-    this.entries = [...INITIAL_CLIPBOARD_ENTRIES];
+    // Real data only: fresh installation produces a genuinely empty history
+    this.entries = [];
     this.save();
     this.isLoaded = true;
     return this.entries;
