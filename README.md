@@ -8,9 +8,36 @@ LucidClip aims to make previously copied text and captured screenshots instantly
 
 Instead of losing important information when copying something new, LucidClip is designed to preserve your clipboard history and screenshots locally, giving you a centralized place to find them whenever you need them.
 
-> **Project Status:** Phase 1 — Documentation & Product Foundation  
-> **Platform:** Windows 10 / Windows 11  
-> **Development:** In Progress
+> **Project Status:** Active Architecture & Local-First Desktop Implementation  
+> **Platform:** Windows 10 / Windows 11 (Cross-platform dev support)  
+> **Backend:** Rust, Tauri 2, SQLite  
+> **Frontend:** React 18, TypeScript, Vite, Tailwind CSS  
+
+---
+
+## Quick Start & Development
+
+LucidClip uses a decoupled architecture with a React frontend and a Rust/Tauri 2 backend:
+
+```bash
+# Install dependencies across all workspaces
+npm install
+
+# Launch complete desktop application development environment
+npm run dev
+
+# Run automated integrity test suite
+npm test
+
+# Run frontend typecheck and production build
+npm run typecheck
+npm run build
+
+# Run Rust backend unit tests
+cd backend && cargo test
+```
+
+For detailed architecture, storage hierarchies, and database migration specs, see [docs/BACKEND.md](docs/BACKEND.md) and [docs/FRONTEND.md](docs/FRONTEND.md).
 
 ---
 
