@@ -1,6 +1,13 @@
 export type OcrStatus = 'none' | 'pending' | 'completed' | 'failed';
 export type CaptureType = 'fullscreen' | 'region';
 
+export interface ScreenshotRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ScreenshotEntry {
   id: string;
   thumbnailUrl: string;
@@ -11,12 +18,7 @@ export interface ScreenshotEntry {
   ocrText?: string;
   ocrStatus: OcrStatus;
   captureType: CaptureType;
-  capturedRegion?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  capturedRegion?: ScreenshotRegion;
   isPinned: boolean;
   isFavorite: boolean;
   createdAt: string; // ISO 8601
