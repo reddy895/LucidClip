@@ -83,6 +83,8 @@ pub fn run() {
             commands::get_screenshots,
             commands::capture_screenshot,
             commands::crop_screenshot,
+            commands::copy_screenshot_image,
+            commands::export_screenshot,
             commands::delete_screenshot,
             commands::toggle_screenshot_pin,
             commands::toggle_screenshot_favorite,

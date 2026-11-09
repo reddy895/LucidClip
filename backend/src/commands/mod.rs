@@ -139,6 +139,39 @@ pub fn crop_screenshot(
 }
 
 #[tauri::command]
+pub fn copy_screenshot_image(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    let entry = service
+        .get(&id)?
+        .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+
+    let image = image::open(&entry.original_path)?.to_rgba8();
+    crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
+
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn export_screenshot(id: String, state: tauri::State<'_, AppState>) -> Result<String> {
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    let entry = service
+        .get(&id)?
+        .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+
+    let export_root = directories::UserDirs::new()
+        .and_then(|dirs| dirs.download_dir().map(|path| path.to_path_buf()))
+        .unwrap_or_else(|| state.paths.root_dir.join("exports"));
+    let target_dir = export_root.join("LucidClip");
+
+    fs::create_dir_all(&target_dir)?;
+
+    let target = target_dir.join(format!("LucidClip_{}.png", entry.id));
+    fs::copy(&entry.original_path, &target)?;
+
+    Ok(target.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn delete_screenshot(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
     let service = ScreenshotService::new(&state.pool, &state.paths);
     service.delete(&id)

@@ -22,6 +22,9 @@ mod windows_clipboard {
     /// Standard clipboard format identifier for null-terminated UTF-16 text.
     const CF_UNICODETEXT: u32 = 13;
 
+    /// Device-independent bitmap format.
+    const CF_DIB: u32 = 8;
+
     /// RAII guard that guarantees the clipboard is closed on every exit path.
     struct ClipboardSession;
 
@@ -88,6 +91,101 @@ mod windows_clipboard {
                 GlobalFree(handle);
                 return Err(AppError::Clipboard(format!(
                     "Failed to set Windows clipboard data (error {error})"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+
+    pub fn write_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
+        if width == 0 || height == 0 {
+            return Err(AppError::Clipboard(
+                "Image dimensions must be greater than zero".into(),
+            ));
+        }
+
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| AppError::Clipboard("Image dimensions are too large".into()))?;
+
+        if rgba.len() != expected {
+            return Err(AppError::Clipboard(
+                "Image buffer does not match its dimensions".into(),
+            ));
+        }
+
+        // BITMAPINFOHEADER is 40 bytes; CF_DIB expects the header immediately
+        // followed by bottom-up BGRA pixels.
+        const HEADER_SIZE: usize = 40;
+        let pixel_bytes = expected;
+        let total_bytes = HEADER_SIZE + pixel_bytes;
+
+        let _session = ClipboardSession::open()?;
+
+        if unsafe { EmptyClipboard() } == 0 {
+            return Err(AppError::Clipboard(format!(
+                "Failed to empty the Windows clipboard (error {})",
+                unsafe { GetLastError() }
+            )));
+        }
+
+        let handle: HGLOBAL = unsafe { GlobalAlloc(GMEM_MOVEABLE, total_bytes) };
+        if handle.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to allocate memory for clipboard image".into(),
+            ));
+        }
+
+        let destination = unsafe { GlobalLock(handle) } as *mut u8;
+        if destination.is_null() {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err(AppError::Clipboard(
+                "Failed to lock clipboard image memory".into(),
+            ));
+        }
+
+        unsafe {
+            let header = destination;
+            std::ptr::write_bytes(header, 0, HEADER_SIZE);
+
+            let write_u32 = |offset: usize, value: u32| {
+                std::ptr::copy_nonoverlapping(
+                    value.to_le_bytes().as_ptr(),
+                    header.add(offset),
+                    4,
+                );
+            };
+            write_u32(0, HEADER_SIZE as u32); // biSize
+            write_u32(4, width); // biWidth
+            write_u32(8, height); // biHeight (positive = bottom-up)
+            write_u32(12, 1u32 | (32u32 << 16)); // biPlanes, biBitCount
+            write_u32(20, pixel_bytes as u32); // biSizeImage
+
+            for row in 0..height as usize {
+                let source_row = (height as usize - 1 - row) * width as usize * 4;
+                let target_row = HEADER_SIZE + row * width as usize * 4;
+                for column in 0..width as usize {
+                    let source = source_row + column * 4;
+                    let target = header.add(target_row + column * 4);
+                    *target = rgba[source + 2]; // blue
+                    *target.add(1) = rgba[source + 1]; // green
+                    *target.add(2) = rgba[source]; // red
+                    *target.add(3) = 255; // alpha is ignored by CF_DIB
+                }
+            }
+
+            GlobalUnlock(handle);
+
+            if SetClipboardData(CF_DIB, handle).is_null() {
+                let error = GetLastError();
+                GlobalFree(handle);
+                return Err(AppError::Clipboard(format!(
+                    "Failed to set Windows clipboard image (error {error})"
                 )));
             }
         }
@@ -192,6 +290,22 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
             text.len()
         );
         Ok(())
+    }
+}
+
+/// Write an RGBA image to the operating system clipboard.
+pub fn set_clipboard_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_clipboard::write_image(rgba, width, height)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (rgba, width, height);
+        Err(crate::errors::AppError::Clipboard(
+            "Copying images is only available on Windows".into(),
+        ))
     }
 }
 
