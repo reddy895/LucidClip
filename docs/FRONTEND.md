@@ -1,7 +1,7 @@
 # LucidClip — Desktop Frontend Implementation & Design Guide
 
 **Document:** Frontend Architecture & Design Specification  
-**Status:** Completed & Verified  
+**Status:** Implemented desktop UI (see limitations)  
 **Stack:** React 18, TypeScript, Vite, Tailwind CSS, Lucide React  
 
 ---
@@ -48,20 +48,20 @@ The interface uses a three-part desktop layout:
 
 ```text
 +--------------------------------------------------------------------------+
-|  [Sidebar Toggle]  LucidClip v1.0   [Quick Access]   [Monitoring Active] |
+|  [Sidebar Toggle]  LucidClip   [Quick Access]   [Monitoring Active] |
 +------------------+------------------------------------+------------------+
 |                  |  Section Title        Search & Sort|                  |
 |  All Items       |  [ Search input               / ]  |  PREVIEW PANEL   |
 |  Clipboard       |  [ All ] [ Text ] [ Code ] [ URLs ]|  Selected Item   |
 |  Screenshots     |                                    |                  |
 |  Pinned          |  Chrono History Feed               |  Full Content /  |
-|  Favorites       |  - Today                           |  OCR Explorer    |
+|  Favorites       |  - Today                           |  Image Inspector |
 |                  |    > Entry 1                       |  Image Inspector |
 |  ----------------|    > Entry 2                       |                  |
 |  Storage Info    |  - Yesterday                       |  Metadata &      |
 |  Settings        |    > Entry 3                       |  Quick Actions   |
 +------------------+------------------------------------+------------------+
-|  Monitoring Active • Win32 Hook    Total Entries      SQLite: Local-first|
+|  Monitoring Active • Native monitor   Total Entries   SQLite: Local-first|
 +--------------------------------------------------------------------------+
 ```
 
@@ -78,7 +78,7 @@ The interface uses a three-part desktop layout:
 
 ### 2.3 Right Contextual Preview Panel (`w-[320px]–[350px]`, collapsible)
 - **Text Preview:** Syntax-highlighted code with line numbers, URL previews with domain cards, formatted full timestamps, word and character counts.
-- **Screenshot Preview:** Aspect-ratio-preserved thumbnail, full image inspector modal, OCR extracted text viewer with one-click copy, and file export.
+- **Screenshot Preview:** Aspect-ratio-preserved image, full image inspector modal, metadata, pin/favorite/delete, image clipboard copy, and PNG export.
 
 ### 2.4 Quick Access Launcher Overlay (`Alt + Space`)
 - Centered keyboard-driven launcher modal
@@ -89,7 +89,7 @@ The interface uses a three-part desktop layout:
 
 ## 3. Desktop Resolution & Responsive Verification
 
-Tested and validated across standard Windows resolutions:
+The layout targets these Windows desktop resolutions:
 
 | Target Resolution | Aspect Ratio | Sidebar | Preview Panel | Behavior |
 |---|---|---|---|---|
@@ -104,21 +104,23 @@ Tested and validated across standard Windows resolutions:
 
 | Shortcut | Scope | Action |
 |---|---|---|
-| `Alt + Space` | Global | Toggle Quick Access Launcher |
-| `/` or `Ctrl + F` | Global | Focus search input |
-| `Ctrl + B` | Global | Toggle sidebar collapse |
-| `Ctrl + P` | Global | Toggle right preview panel |
-| `Ctrl + 1` | Global | Switch to All Items |
-| `Ctrl + 2` | Global | Switch to Clipboard |
-| `Ctrl + 3` | Global | Switch to Screenshots |
-| `Ctrl + 4` | Global | Switch to Pinned |
-| `Ctrl + 5` | Global | Switch to Favorites |
-| `Ctrl + ,` | Global | Switch to Settings |
-| `↑` / `↓` | List View | Move active selection |
-| `Enter` | List View | Copy selected item to clipboard |
-| `P` | List View | Toggle pin status on selected item |
-| `Delete` | List View | Delete selected item |
-| `Escape` | Global | Close overlay, modal, or blur search input |
+| `Alt + Space` | Focused window | Toggle Quick Access Launcher |
+| `/` or `Ctrl + F` | Focused window | Focus search input |
+| `Ctrl + B` | Focused window | Toggle sidebar collapse |
+| `Ctrl + P` | Focused window | Toggle right preview panel |
+| `Ctrl + 1` | Focused window | Switch to All Items |
+| `Ctrl + 2` | Focused window | Switch to Clipboard |
+| `Ctrl + 3` | Focused window | Switch to Screenshots |
+| `Ctrl + 4` | Focused window | Switch to Pinned |
+| `Ctrl + 5` | Focused window | Switch to Favorites |
+| `Ctrl + ,` | Focused window | Switch to Settings |
+| `↑` / `↓` | List view | Move active selection |
+| `Enter` | List view | Copy selected item to clipboard |
+| `P` | List view | Toggle pin status on selected item |
+| `Delete` | List view | Delete selected item |
+| `Escape` | Focused window | Close overlay, modal, or blur search input |
+
+Global hotkeys and system tray integration are not implemented; the shortcuts above only apply while the LucidClip window has focus.
 
 ---
 
@@ -135,3 +137,15 @@ npm run typecheck
 npm run build
 ```
 
+
+---
+
+## 6. Current Limitations
+
+- Screenshot OCR is not implemented, so the UI does not show OCR badges, text panels, or OCR settings.
+- The system tray and close-to-tray behavior are not implemented.
+- Global hotkeys are not registered; in-window shortcuts are the supported path.
+- The screenshot save directory is fixed to the application data folder.
+- Native clipboard, screenshot, and startup paths require Windows and cannot be fully validated in a Linux frontend build.
+
+Unsupported browser development operations return explicit errors rather than generated screenshots or fake OCR.

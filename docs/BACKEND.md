@@ -73,7 +73,7 @@ Fresh installations initialize with zero entries across all sections:
 - `Pinned`: 0 entries
 - `Favorites`: 0 entries
 
-All sample and demo entries are isolated solely to test fixtures and are never injected into the application database or runtime state.
+The production runtime and browser development adapters initialize empty. Sample fixtures and generated demo images/OCR have been removed; unsupported operations return explicit errors instead of fabricating results.
 
 ## 5. Verification Commands
 - `npm test`: Runs automated verification suite (`scripts/test-runner.mjs`)
@@ -92,9 +92,13 @@ The registered handlers in `backend/src/commands/mod.rs` are:
 | `copy_clipboard_entry` | Restore text to the operating system clipboard |
 | `delete_clipboard_entry` | Delete a single clipboard entry |
 | `toggle_clipboard_pin` / `toggle_clipboard_favorite` | Toggle entry flags |
-| `clear_clipboard_history` | Delete all unpinned clipboard entries |
+| `clear_clipboard_history` | Delete all unpinned, non-favorite clipboard entries |
 | `get_screenshots` | List persisted screenshot records |
-| `delete_screenshot` | Remove the record and its original/thumbnail files |
+| `capture_screenshot` | Capture the desktop or a validated region and persist PNG files |
+| `crop_screenshot` | Crop a stored capture into a region screenshot |
+| `copy_screenshot_image` | Copy a stored PNG to the Windows clipboard as `CF_DIB` |
+| `export_screenshot` | Copy a stored PNG into the user's Downloads folder |
+| `delete_screenshot` | Remove the record first, then its original/thumbnail files |
 | `toggle_screenshot_pin` / `toggle_screenshot_favorite` | Toggle screenshot flags |
 | `get_settings` / `update_setting` | Read and upsert JSON application settings |
 | `get_storage_stats` | Report database and screenshot storage usage |
@@ -111,25 +115,53 @@ No screenshot directory outside the application data root is exposed to the webv
 
 ## 8. Clipboard Restoration
 
-`copy_clipboard_entry` delegates to `backend/src/platform/clipboard.rs`. On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData` with a null-terminated UTF-16 buffer. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts are development-only and log the write without touching the host clipboard.
+`copy_clipboard_entry` delegates to `backend/src/platform/clipboard.rs`. On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData` with a null-terminated UTF-16 buffer. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts return an explicit unsupported error. Screenshot images are written as 32-bit bottom-up `CF_DIB` data through `copy_screenshot_image`.
 
 ## 9. Unified Search Data Flow
 
 The All Items workspace uses `HistorySearchService`, which is constructed with the active clipboard and screenshot adapters. In the desktop build those adapters are the Tauri IPC services, so search always reads from the local SQLite store. The browser development build injects the mock adapters instead. Filtering and sorting live in the pure `filterHistory` utility so both paths behave identically.
 
-## 10. Implementation Status
+## 10. Background Clipboard Monitor
+
+`backend/src/clipboard/monitor.rs` spawns one named thread during Tauri setup. Every 500 ms it:
+
+1. Reads `app_settings` from SQLite.
+2. Stops while monitoring is disabled or paused.
+3. Resolves the foreground process executable and skips configured exclusions.
+4. Skips content flagged through `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory`, or `CanUploadToCloudClipboard` when password-manager protection is enabled. If the check itself fails, the tick is skipped.
+5. Reads supported clipboard text, rejects oversized payloads, deduplicates by hash, applies retention, and emits `clipboard://new-entry`.
+
+The thread exits when the application sets its shutdown flag.
+
+## 11. Screenshot Capture and Storage
+
+`backend/src/screenshots/service.rs` validates capture bounds against the Windows virtual desktop, captures through GDI, normalizes BGRA to RGBA, writes a PNG original and bounded thumbnail, records real metadata, and removes partial files if any step fails. Region capture uses a temporary real desktop capture so the user drags over actual pixels; the crop command stores the selection with absolute screen coordinates and can remove the temporary source.
+
+Screenshot deletion removes the SQLite row before unlinking files. A failed unlink can leave an orphaned file, but the gallery can never reference a missing image.
+
+## 12. Retention, Exclusions, and Startup
+
+- Retention deletes unpinned, non-favorite entries beyond the configured count or age after each capture and at startup.
+- Exclusions compare the foreground executable name case-insensitively.
+- Launch at login writes or removes the current executable under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LucidClip`.
+- Settings updates synchronize the registry entry before persisting, so a registry failure is reported instead of claiming success.
+
+## 13. Implementation Status
 
 Implemented:
 - React/Tauri 2 application shell with the graphite desktop workspace.
 - SQLite database, migrations, repositories, and WAL configuration.
-- Clipboard text classification, SHA-256 normalization, and deduplication.
-- Clipboard and screenshot history, pin/favorite/delete, settings, and storage statistics commands.
-- Native Windows clipboard restoration and scoped screenshot asset delivery.
+- Clipboard text classification, SHA-256 normalization, deduplication, monitoring, retention, exclusions, and sensitive-format checks.
+- Clipboard and screenshot history, pin/favorite/delete, settings, and real storage statistics.
+- Native Windows clipboard text and image writing, scoped screenshot asset delivery.
+- Full-desktop and region screenshot capture, thumbnails, crop, copy, and export.
+- Launch at Windows login.
 
-Not yet implemented:
-- Background clipboard change listener / polling loop.
-- Screenshot capture, thumbnail generation, and OCR pipeline.
-- Retention and max-history enforcement against captured data.
-- System tray, launch-at-startup, and global hotkey registration.
+Not implemented:
+- Screenshot OCR or text extraction.
+- System tray icon and close-to-tray behavior.
+- Global hotkey registration outside the focused window.
+- Configurable screenshot save directory.
+- Signed installer and public release packaging.
 
-Documentation should keep the implemented IPC surface separate from these planned capabilities.
+Documentation must keep this implemented surface separate from roadmap items.

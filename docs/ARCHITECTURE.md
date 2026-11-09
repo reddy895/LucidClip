@@ -11,6 +11,8 @@
 
 ---
 
+> **Implementation note:** This document remains the proposed long-term architecture. The current Windows build implements clipboard monitoring, SQLite persistence, screenshot capture and region cropping, image copy/export, retention, exclusions, and launch-at-login. OCR processing, system tray behavior, and global hotkeys described below are still roadmap items and are not exposed as working controls.
+
 # 1. Introduction
 
 ## 1.1 Purpose
