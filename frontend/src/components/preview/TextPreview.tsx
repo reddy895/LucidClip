@@ -163,11 +163,14 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
                 <Hash className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
                 <div>
                   <div className="text-[10px] text-graphite-text-muted">
-                    {entry.contentType === 'files' ? 'Files / Size' : 'Size'}
+                    {entry.contentType === 'files' ? 'Files' : 'Size'}
                   </div>
                   <div className="font-mono font-medium text-graphite-text-primary">
-                    {entry.contentType === 'files' && `${entry.fileCount ?? 0} / `}
-                    {typeof entry.byteSize === 'number' ? formatBytes(entry.byteSize) : 'Unknown'}
+                    {entry.contentType === 'files'
+                      ? entry.fileCount ?? 0
+                      : typeof entry.byteSize === 'number'
+                      ? formatBytes(entry.byteSize)
+                      : 'Unknown'}
                   </div>
                 </div>
               </div>
