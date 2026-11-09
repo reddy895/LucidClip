@@ -37,30 +37,8 @@ pub fn add_clipboard_entry(
 
 #[tauri::command]
 pub fn copy_clipboard_entry(content: String) -> Result<bool> {
-    #[cfg(target_os = "windows")]
-    {
-        // On Windows native runtime, set system clipboard
-        use std::process::Command;
-        let mut child = Command::new("powershell")
-            .args(["-NoProfile", "-Command", "Set-Clipboard -Value $input"])
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| AppError::Clipboard(format!("Failed to spawn clipboard setter: {e}")))?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write;
-            let _ = stdin.write_all(content.as_bytes());
-        }
-        let _ = child.wait();
-        Ok(true)
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        // Cross-platform dev fallback
-        println!("[LucidClip IPC] Copied {} characters to clipboard", content.len());
-        Ok(true)
-    }
+    crate::platform::set_clipboard_text(&content)?;
+    Ok(true)
 }
 
 #[tauri::command]
