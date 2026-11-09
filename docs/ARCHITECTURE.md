@@ -11,7 +11,7 @@
 
 ---
 
-> **Implementation note:** This document remains the proposed long-term architecture. The current Windows build implements clipboard monitoring, SQLite persistence, screenshot capture and region cropping, image copy/export, retention, exclusions, launch-at-login, and system-tray background operation. OCR processing and global hotkeys described below are still roadmap items and are not exposed as working controls.
+> **Implementation note:** This document remains the proposed long-term architecture. The current Windows build implements native clipboard notifications, text/image/file capture, SQLite persistence, screenshot capture and region cropping, image copy/export, retention, exclusions, launch-at-login, and system-tray background operation. OCR processing and global hotkeys described below are still roadmap items and are not exposed as working controls.
 
 # 1. Introduction
 
@@ -31,8 +31,8 @@ The application operates primarily on the local machine.
 
 Its main responsibilities are:
 
-- Monitor supported clipboard changes.
-- Capture and store clipboard content.
+- Monitor native clipboard changes with a polling fallback.
+- Capture and store clipboard text, images, and file references.
 - Capture screenshots.
 - Extract text from screenshots using local OCR.
 - Maintain persistent history.

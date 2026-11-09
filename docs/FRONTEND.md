@@ -78,6 +78,7 @@ The interface uses a three-part desktop layout:
 
 ### 2.3 Right Contextual Preview Panel (`w-[320px]–[350px]`, collapsible)
 - **Text Preview:** Syntax-highlighted code with line numbers, URL previews with domain cards, formatted full timestamps, word and character counts.
+- **Clipboard Media Preview:** Scoped images with dimensions and size, or multiline file-path lists with file counts and size.
 - **Screenshot Preview:** Aspect-ratio-preserved image, full image inspector modal, metadata, pin/favorite/delete, image clipboard copy, and PNG export.
 
 ### 2.4 Quick Access Launcher Overlay (`Alt + Space`)
@@ -120,7 +121,7 @@ The layout targets these Windows desktop resolutions:
 | `Delete` | List view | Delete selected item |
 | `Escape` | Focused window | Close overlay, modal, or blur search input |
 
-Global hotkeys and system tray integration are not implemented; the shortcuts above only apply while the LucidClip window has focus.
+Global hotkeys are not implemented; the shortcuts above only apply while the LucidClip window has focus. Closing the window uses the system tray rather than ending the backend.
 
 ---
 
@@ -147,5 +148,6 @@ npm run build
 - Global hotkeys are not registered; in-window shortcuts are the supported path.
 - The screenshot save directory is fixed to the application data folder.
 - Native clipboard, screenshot, and startup paths require Windows and cannot be fully validated in a Linux frontend build.
+- Clipboard images and file lists are captured only on Windows; Linux builds do not inspect the clipboard.
 
 Unsupported browser development operations return explicit errors rather than generated screenshots or fake OCR.

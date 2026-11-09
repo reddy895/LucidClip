@@ -2,9 +2,9 @@
 
 **A privacy-first, local-only clipboard and screenshot history manager for Windows.**
 
-LucidClip keeps copied text and captured screenshots searchable on the local machine. It does not require an account, does not upload data, and does not include telemetry.
+LucidClip keeps copied text, images, file references, and captured screenshots searchable on the local machine. It does not require an account, does not upload data, and does not include telemetry.
 
-> **Project status:** Active Windows desktop implementation. Clipboard monitoring, SQLite persistence, screenshot capture and region selection, image copy/export, retention, source-app exclusions, launch-at-login, and background system-tray operation are implemented. OCR and global hotkeys remain planned and are not exposed as working controls.
+> **Project status:** Active Windows desktop implementation. Native clipboard notifications, text/image/file capture, SQLite persistence, screenshot capture and region selection, image copy/export, retention, source-app exclusions, launch-at-login, and background system-tray operation are implemented. OCR and global hotkeys remain planned and are not exposed as working controls.
 >
 > **Platform:** Windows 10 / Windows 11 (64-bit target)
 >
@@ -18,14 +18,16 @@ LucidClip keeps copied text and captured screenshots searchable on the local mac
 
 ### Clipboard history
 
-- Polls the Windows clipboard for supported text while monitoring is enabled.
-- Classifies text as plain, multiline, URL, JSON, code, color, or file path.
-- Deduplicates by a normalized SHA-256 hash and refreshes the timestamp of repeated content.
-- Stores history in SQLite with WAL mode.
-- Supports pin, favorite, delete, manual snippets, clear-history, and copy-back to the clipboard.
+- Listens for native Windows clipboard updates, with a two-second safety pass and a polling fallback.
+- Captures Unicode text, `CF_DIB`/`CF_DIBV5` images, and Explorer `CF_HDROP` file lists.
+- Classifies text as plain, multiline, URL, JSON, code, color, or file path; images and file lists use dedicated types.
+- Deduplicates by domain-separated SHA-256 hashes and refreshes the timestamp of repeated content.
+- Stores clipboard images as PNG originals plus 320x180-bounded thumbnails under the existing screenshot directories.
+- Stores history in SQLite with WAL mode and clipboard media metadata.
+- Supports pin, favorite, delete, manual snippets, clear-history, and copy-back in the original format.
 - Honors configurable maximum entry counts and cleanup age; pinned and favorite entries are preserved.
 - Skips configured source applications and clipboard contents marked sensitive by Windows opt-out formats.
-- Emits a desktop event so the UI refreshes when new text is captured.
+- Emits the persisted entry so the UI updates immediately; deleting or clearing entries also removes their media files.
 
 ### Screenshots
 
@@ -35,6 +37,7 @@ LucidClip keeps copied text and captured screenshots searchable on the local mac
 - Persists dimensions, file size, capture type, and screen-relative region bounds.
 - Supports pin, favorite, delete, copy-image-to-clipboard through `CF_DIB`, and PNG export to the Downloads folder.
 - Removes image files only after the database row is deleted, avoiding gallery records that point at missing files.
+- Clipboard images share the same scoped storage directories but never appear in the screenshot gallery.
 
 ### Settings and storage
 
@@ -92,7 +95,7 @@ On Windows, application data is stored under `%LOCALAPPDATA%\LucidClip\`:
 LucidClip/
 ├── lucidclip.db            SQLite database (WAL mode)
 ├── screenshots/
-│   ├── originals/          Full-resolution PNG files
+│   ├── originals/          Screenshot and clipboard PNG files
 │   └── thumbnails/         320x180-bounded PNG previews
 └── logs/                   Reserved for diagnostics
 ```
@@ -125,7 +128,7 @@ flowchart LR
     UI -->|scoped asset protocol| FILES
 ```
 
-- The clipboard monitor polls every 500 ms and applies pause, exclusion, and retention settings.
+- The clipboard monitor listens for native Windows notifications, debounces bursts, and keeps a two-second safety pass plus a polling fallback; pause, exclusion, and retention settings apply before persistence.
 - Closing the main window hides it to the tray; the monitor keeps running until Quit is selected.
 - Capture and persistence run in the Rust backend; the frontend only requests operations and renders real stored data.
 - The browser development build uses local adapters and refuses operations that require Window-native capture.
@@ -155,14 +158,16 @@ LucidClip/
 ## Privacy
 
 - No account, cloud sync, analytics, or remote API calls.
-- Clipboard text and screenshot files stay on the local machine.
+- Clipboard text, clipboard media, and screenshot files stay on the local machine.
 - Sensitive clipboard formats can be skipped, and source applications can be excluded.
 - Monitoring can be paused at any time.
-- Deleting history removes local rows; screenshot deletion also removes the image files.
+- Deleting history removes local rows and clipboard media files; screenshot deletion removes its image files.
 
 ## Limitations
 
 - Native clipboard, capture, and startup behavior can only be fully verified on Windows.
+- Clipboard capture is Windows-only. On Windows, bitmap capture accepts uncompressed 24/32-bit `CF_DIB` data and file capture accepts wide-character `CF_HDROP` lists.
+- Linux clipboard monitoring remains unsupported; the UI reports this limitation instead of fabricating entries.
 - Cross-compiling the full backend on Linux is blocked by the bundled SQLite build needing a MinGW C compiler; Windows-only modules are checked separately with the GNU target.
 - OCR and global shortcut behavior remain roadmap items rather than shipped features.
 - The tray icon uses the bundled application icon; native tray behavior is verified on Windows during release testing.

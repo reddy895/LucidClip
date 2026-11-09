@@ -45,12 +45,17 @@ The database migration engine tracks versions in `schema_migrations`:
 - `clipboard_entries`:
   - `id TEXT PRIMARY KEY`: Unique entry identifier
   - `content TEXT NOT NULL`: Captured text
-  - `content_type TEXT NOT NULL`: Classified category (`plain`, `multiline`, `url`, `code`, `json`, `color_code`, `path`)
+  - `content_type TEXT NOT NULL`: Classified category (`text`, `multiline`, `url`, `code`, `json`, `color_code`, `path`, `image`, `files`)
   - `source_app TEXT`: Window/process metadata
   - `created_at INTEGER NOT NULL`: Millisecond epoch timestamp
   - `content_hash TEXT NOT NULL UNIQUE`: SHA-256 hash for O(1) deduplication
   - `pinned INTEGER NOT NULL DEFAULT 0`: Pinned status flag
   - `favorite INTEGER NOT NULL DEFAULT 0`: Favorite status flag
+  - `image_path TEXT`: Original PNG path for clipboard images
+  - `thumbnail_path TEXT`: Thumbnail PNG path for clipboard images
+  - `image_width INTEGER`, `image_height INTEGER`: Clipboard image dimensions
+  - `byte_size INTEGER NOT NULL DEFAULT 0`: Stored content or media size
+  - `file_count INTEGER NOT NULL DEFAULT 0`: Number of paths in a file-list entry
 - `screenshots`:
   - `id TEXT PRIMARY KEY`: Unique screenshot identifier
   - `original_path TEXT NOT NULL`: Filesystem path to full image
@@ -89,7 +94,8 @@ The registered handlers in `backend/src/commands/mod.rs` are:
 |---|---|
 | `get_clipboard_entries` | List persisted clipboard entries (newest first) |
 | `add_clipboard_entry` | Classify, hash, deduplicate, and persist copied text |
-| `copy_clipboard_entry` | Restore text to the operating system clipboard |
+| `copy_clipboard_entry` | Restore plain text to the operating system clipboard |
+| `copy_clipboard_entry_by_id` | Restore a stored entry as text, `CF_DIB` image, or `CF_HDROP` file list |
 | `delete_clipboard_entry` | Delete a single clipboard entry |
 | `toggle_clipboard_pin` / `toggle_clipboard_favorite` | Toggle entry flags |
 | `clear_clipboard_history` | Delete all unpinned, non-favorite clipboard entries |
@@ -109,13 +115,15 @@ Screenshot files live outside the webview origin, so absolute filesystem paths c
 
 - Enables the Tauri `protocol-asset` crate feature in `backend/Cargo.toml`.
 - Enables `app.security.assetProtocol` in `backend/tauri.conf.json` with a scope limited to the LucidClip screenshot directories for both Windows (`%LOCALAPPDATA%/LucidClip`) and the Linux development data directory.
-- Converts `original_path` and `thumbnail_path` with `convertFileSrc` inside `frontend/src/services/tauri/TauriScreenshotService.ts`.
+- Converts `original_path`, `thumbnail_path`, and clipboard image paths with `convertFileSrc` inside the Tauri services.
 
 No screenshot directory outside the application data root is exposed to the webview.
 
 ## 8. Clipboard Restoration
 
-`copy_clipboard_entry` delegates to `backend/src/platform/clipboard.rs`. On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData` with a null-terminated UTF-16 buffer. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts return an explicit unsupported error. Screenshot images are written as 32-bit bottom-up `CF_DIB` data through `copy_screenshot_image`.
+`copy_clipboard_entry` writes plain text through `backend/src/platform/clipboard.rs`. `copy_clipboard_entry_by_id` loads the stored entry type and restores text, a stored PNG as 32-bit bottom-up `CF_DIB` image data, or a stored path list as a wide-character `CF_HDROP` buffer.
+
+On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData`. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts return an explicit unsupported error.
 
 ## 9. Unified Search Data Flow
 
@@ -123,15 +131,18 @@ The All Items workspace uses `HistorySearchService`, which is constructed with t
 
 ## 10. Background Clipboard Monitor
 
-`backend/src/clipboard/monitor.rs` spawns one named thread during Tauri setup. Every 500 ms it:
+`backend/src/clipboard/monitor.rs` spawns one named thread during Tauri setup. On Windows, `backend/src/platform/clipboard_watcher.rs` creates a message-only window and listens for `WM_CLIPBOARDUPDATE`; the monitor waits on those notifications, debounces bursts for 120 ms, and runs a two-second safety pass. If native registration fails, it falls back to 500 ms polling.
+
+Each capture tick:
 
 1. Reads `app_settings` from SQLite.
 2. Stops while monitoring is disabled or paused.
 3. Resolves the foreground process executable and skips configured exclusions.
 4. Skips content flagged through `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory`, or `CanUploadToCloudClipboard` when password-manager protection is enabled. If the check itself fails, the tick is skipped.
-5. Reads supported clipboard text, rejects oversized payloads, deduplicates by hash, applies retention, and emits `clipboard://new-entry`.
+5. Reads the highest-priority supported value from one clipboard session: wide `CF_HDROP`, then 24/32-bit `CF_DIB`/`CF_DIBV5`, then `CF_UNICODETEXT`.
+6. Rejects oversized payloads, deduplicates by a domain-separated hash, stores text/image/file metadata, applies retention, and emits the persisted entry as `clipboard://new-entry`.
 
-The thread exits when the application sets its shutdown flag.
+Malformed higher-priority formats are logged without content and fall through to lower-priority formats. The thread exits when the application sets its shutdown flag.
 
 ## 11. Screenshot Capture and Storage
 
@@ -152,9 +163,9 @@ Screenshot deletion removes the SQLite row before unlinking files. A failed unli
 Implemented:
 - React/Tauri 2 application shell with the graphite desktop workspace.
 - SQLite database, migrations, repositories, and WAL configuration.
-- Clipboard text classification, SHA-256 normalization, deduplication, monitoring, retention, exclusions, and sensitive-format checks.
+- Native Windows clipboard notifications with polling fallback, text/image/file capture, SHA-256 deduplication, retention, exclusions, and sensitive-format checks.
 - Clipboard and screenshot history, pin/favorite/delete, settings, and real storage statistics.
-- Native Windows clipboard text and image writing, scoped screenshot asset delivery.
+- Native Windows clipboard text, image, and file-list writing, plus scoped asset delivery.
 - Full-desktop and region screenshot capture, thumbnails, crop, copy, and export.
 - Launch at Windows login.
 - System tray background operation with explicit Show and Quit actions.
