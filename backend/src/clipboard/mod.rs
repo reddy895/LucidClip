@@ -2,6 +2,7 @@
 
 pub mod classifier;
 pub mod hasher;
+pub mod media;
 pub mod monitor;
 pub mod service;
 
