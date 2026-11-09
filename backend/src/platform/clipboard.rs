@@ -11,7 +11,7 @@ mod windows_clipboard {
     use windows_sys::Win32::Foundation::{GetLastError, GlobalFree, HGLOBAL};
     use windows_sys::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
-        OpenClipboard, SetClipboardData,
+        OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
     };
     use windows_sys::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
@@ -95,6 +95,50 @@ mod windows_clipboard {
         Ok(())
     }
 
+    /// Check the standard Windows opt-out formats that password managers and
+    /// other sensitive applications use to exclude clipboard contents.
+    pub fn content_is_sensitive() -> Result<bool> {
+        let _session = ClipboardSession::open()?;
+
+        let excluded = register_format("ExcludeClipboardContentFromMonitorProcessing");
+        if excluded != 0 && unsafe { IsClipboardFormatAvailable(excluded) } != 0 {
+            return Ok(true);
+        }
+
+        for name in ["CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"] {
+            let format = register_format(name);
+            if format == 0 || unsafe { IsClipboardFormatAvailable(format) } == 0 {
+                continue;
+            }
+
+            let handle = unsafe { GetClipboardData(format) };
+            if handle.is_null() {
+                continue;
+            }
+
+            let value = unsafe { GlobalLock(handle) } as *const u32;
+            if value.is_null() {
+                continue;
+            }
+
+            let allowed = unsafe { *value };
+            unsafe {
+                GlobalUnlock(handle);
+            }
+
+            if allowed == 0 {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn register_format(name: &str) -> u32 {
+        let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+        unsafe { RegisterClipboardFormatW(wide.as_ptr()) }
+    }
+
     pub fn read_text() -> Result<Option<String>> {
         let _session = ClipboardSession::open()?;
 
@@ -165,6 +209,20 @@ pub fn read_clipboard_text() -> Result<Option<String>> {
     #[cfg(not(target_os = "windows"))]
     {
         Ok(None)
+    }
+}
+
+/// Whether the clipboard currently carries an application-declared sensitive
+/// marker. Hosts without native clipboard integration report `false`.
+pub fn clipboard_content_is_sensitive() -> Result<bool> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_clipboard::content_is_sensitive()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false)
     }
 }
 

@@ -25,33 +25,85 @@ const POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// Guard against pathological clipboard payloads freezing the UI or database.
 const MAX_CAPTURE_CHARS: usize = 1_000_000;
 
-/// Read the persisted application settings and decide whether monitoring runs.
+#[derive(Debug)]
+struct MonitorPolicy {
+    enabled: bool,
+    excluded_apps: Vec<String>,
+    exclude_sensitive: bool,
+}
+
+impl Default for MonitorPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            excluded_apps: Vec::new(),
+            exclude_sensitive: false,
+        }
+    }
+}
+
+/// Read the persisted application settings.
 ///
 /// The frontend stores the full settings payload under `app_settings`. Missing
 /// or malformed settings default to enabled so a fresh install captures text.
-fn monitoring_enabled(pool: &DbPool) -> bool {
+fn monitor_policy(pool: &DbPool) -> MonitorPolicy {
     let repo = SettingsRepo::new(pool);
     let Ok(Some(raw)) = repo.get("app_settings") else {
-        return true;
+        return MonitorPolicy::default();
     };
 
     let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) else {
-        return true;
+        return MonitorPolicy::default();
     };
 
     let clipboard_enabled = value
-        .get("clipboard")
-        .and_then(|clipboard| clipboard.get("monitoringEnabled"))
+        .pointer("/clipboard/monitoringEnabled")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(true);
 
     let paused = value
-        .get("privacy")
-        .and_then(|privacy| privacy.get("pauseMonitoring"))
+        .pointer("/privacy/pauseMonitoring")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
 
-    clipboard_enabled && !paused
+    let excluded_apps = value
+        .pointer("/clipboard/excludedApps")
+        .and_then(serde_json::Value::as_array)
+        .map(|apps| {
+            apps.iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(|app| app.trim().to_string())
+                .filter(|app| !app.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let exclude_sensitive = value
+        .pointer("/privacy/excludePasswordManagers")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+
+    MonitorPolicy {
+        enabled: clipboard_enabled && !paused,
+        excluded_apps,
+        exclude_sensitive,
+    }
+}
+
+#[cfg(test)]
+fn monitoring_enabled(pool: &DbPool) -> bool {
+    monitor_policy(pool).enabled
+}
+
+fn is_excluded_process(policy: &MonitorPolicy, process: Option<&str>) -> bool {
+    let Some(process) = process else {
+        return false;
+    };
+
+    policy
+        .excluded_apps
+        .iter()
+        .any(|excluded| excluded.eq_ignore_ascii_case(process))
 }
 
 /// Start the clipboard monitor thread.
@@ -70,7 +122,38 @@ pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
             let mut last_hash: Option<String> = None;
 
             while !stop.load(Ordering::Relaxed) {
-                if monitoring_enabled(&pool) {
+                let policy = monitor_policy(&pool);
+                if policy.enabled {
+                    let foreground = match platform::foreground_process_name() {
+                        Ok(name) => name,
+                        Err(err) => {
+                            eprintln!("[LucidClip Monitor] Could not resolve source app: {err}");
+                            None
+                        }
+                    };
+
+                    if is_excluded_process(&policy, foreground.as_deref()) {
+                        thread::sleep(POLL_INTERVAL);
+                        continue;
+                    }
+
+                    if policy.exclude_sensitive {
+                        match platform::clipboard_content_is_sensitive() {
+                            Ok(true) => {
+                                thread::sleep(POLL_INTERVAL);
+                                continue;
+                            }
+                            Ok(false) => {}
+                            Err(err) => {
+                                eprintln!(
+                                    "[LucidClip Monitor] Sensitive-content check failed; skipping tick: {err}"
+                                );
+                                thread::sleep(POLL_INTERVAL);
+                                continue;
+                            }
+                        }
+                    }
+
                     match platform::read_clipboard_text() {
                         Ok(Some(text)) if !text.trim().is_empty() => {
                             if text.chars().count() > MAX_CAPTURE_CHARS {
@@ -81,7 +164,7 @@ pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
                                 let hash = hash_content(&text);
                                 if last_hash.as_deref() != Some(hash.as_str()) {
                                     let service = ClipboardService::new(&pool);
-                                    match service.process_copied_text(&text, None) {
+                                    match service.process_copied_text(&text, foreground) {
                                         Ok(entry) => {
                                             last_hash = Some(hash);
                                             if let Err(err) =
@@ -168,5 +251,42 @@ mod tests {
             .set("app_settings", "not-json")
             .unwrap();
         assert!(monitoring_enabled(&pool));
+    }
+}
+
+#[cfg(test)]
+mod exclusion_tests {
+    use super::*;
+    use crate::database::run_migrations;
+
+    #[test]
+    fn excluded_process_matching_is_case_insensitive() {
+        let policy = MonitorPolicy {
+            enabled: true,
+            excluded_apps: vec!["KeePass.exe".into(), "Bitwarden.exe".into()],
+            exclude_sensitive: true,
+        };
+
+        assert!(is_excluded_process(&policy, Some("keepass.exe")));
+        assert!(is_excluded_process(&policy, Some("BITWARDEN.EXE")));
+        assert!(!is_excluded_process(&policy, Some("Code.exe")));
+        assert!(!is_excluded_process(&policy, None));
+    }
+
+    #[test]
+    fn policy_reads_exclusions_and_sensitive_flag() {
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        SettingsRepo::new(&pool)
+            .set(
+                "app_settings",
+                r#"{"clipboard":{"monitoringEnabled":true,"excludedApps":["KeePass.exe"]},"privacy":{"pauseMonitoring":false,"excludePasswordManagers":true}}"#,
+            )
+            .unwrap();
+
+        let policy = monitor_policy(&pool);
+        assert!(policy.enabled);
+        assert!(policy.exclude_sensitive);
+        assert_eq!(policy.excluded_apps, vec!["KeePass.exe".to_string()]);
     }
 }
