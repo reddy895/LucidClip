@@ -11,9 +11,13 @@ export class TauriSettingsService implements ISettingsService {
   async getSettings(): Promise<AppSettings> {
     const records = await invoke<Record<string, string>>('get_settings');
     if (records && Object.keys(records).length > 0) {
+      const stored = JSON.parse(records['app_settings'] || '{}') as Partial<AppSettings>;
       this.cache = {
-        ...DEFAULT_SETTINGS,
-        ...JSON.parse(records['app_settings'] || '{}'),
+        general: { ...DEFAULT_SETTINGS.general, ...(stored.general || {}) },
+        clipboard: { ...DEFAULT_SETTINGS.clipboard, ...(stored.clipboard || {}) },
+        screenshots: { ...DEFAULT_SETTINGS.screenshots, ...(stored.screenshots || {}) },
+        shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...(stored.shortcuts || {}) },
+        privacy: { ...DEFAULT_SETTINGS.privacy, ...(stored.privacy || {}) },
       };
     }
     return this.cache;
