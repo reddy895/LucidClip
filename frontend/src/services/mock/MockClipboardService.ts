@@ -103,7 +103,7 @@ export class MockClipboardService implements IClipboardService {
   async clearHistory(): Promise<void> {
     // Keep pinned items when clearing history per standard desktop clipboard manager convention
     const list = this.load();
-    this.entries = list.filter((item) => item.isPinned);
+    this.entries = list.filter((item) => item.isPinned || item.isFavorite);
     this.save();
     return Promise.resolve();
   }

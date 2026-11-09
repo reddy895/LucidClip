@@ -104,7 +104,7 @@ export class MockSettingsService implements ISettingsService, IStorageService {
     const shotBytes = shots.reduce((sum, s) => sum + s.fileSizeBytes, 0);
 
     return Promise.resolve({
-      dbSizeBytes: clipBytes + 4096 * 4, // simulated SQLite DB header + page size
+      dbSizeBytes: clipBytes,
       screenshotStorageBytes: shotBytes,
       entryCount: clips.length,
       screenshotCount: shots.length,
