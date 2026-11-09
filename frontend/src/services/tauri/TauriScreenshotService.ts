@@ -57,13 +57,8 @@ function mapDtoToEntry(dto: DbScreenshotDto): ScreenshotEntry {
 
 export class TauriScreenshotService implements IScreenshotService {
   async getScreenshots(): Promise<ScreenshotEntry[]> {
-    try {
-      const list = await invoke<DbScreenshotDto[]>('get_screenshots');
-      return list.map(mapDtoToEntry);
-    } catch (err) {
-      console.error('[LucidClip] Failed to fetch screenshots from backend:', err);
-      return [];
-    }
+    const list = await invoke<DbScreenshotDto[]>('get_screenshots');
+    return list.map(mapDtoToEntry);
   }
 
   async getScreenshotById(id: string): Promise<ScreenshotEntry | null> {
@@ -120,12 +115,7 @@ export class TauriScreenshotService implements IScreenshotService {
   }
 
   async deleteScreenshot(id: string): Promise<boolean> {
-    try {
-      return await invoke<boolean>('delete_screenshot', { id });
-    } catch (err) {
-      console.error('[LucidClip] Failed to delete screenshot via backend:', err);
-      return false;
-    }
+    return await invoke<boolean>('delete_screenshot', { id });
   }
 
   async exportScreenshot(id: string): Promise<string> {
