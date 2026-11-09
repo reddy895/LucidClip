@@ -9,18 +9,14 @@ export class TauriSettingsService implements ISettingsService {
   private cache: AppSettings = DEFAULT_SETTINGS;
 
   async getSettings(): Promise<AppSettings> {
-    try {
-      const records = await invoke<Record<string, string>>('get_settings');
-      if (records && Object.keys(records).length > 0) {
-        this.cache = {
-          ...DEFAULT_SETTINGS,
-          ...JSON.parse(records['app_settings'] || '{}'),
-        };
-      }
-      return this.cache;
-    } catch {
-      return this.cache;
+    const records = await invoke<Record<string, string>>('get_settings');
+    if (records && Object.keys(records).length > 0) {
+      this.cache = {
+        ...DEFAULT_SETTINGS,
+        ...JSON.parse(records['app_settings'] || '{}'),
+      };
     }
+    return this.cache;
   }
 
   async updateSettings(partial: Partial<AppSettings>): Promise<AppSettings> {
@@ -34,28 +30,20 @@ export class TauriSettingsService implements ISettingsService {
       privacy: { ...this.cache.privacy, ...(partial.privacy || {}) },
     };
 
-    try {
-      await invoke('update_setting', {
-        key: 'app_settings',
-        value: JSON.stringify(this.cache),
-      });
-    } catch (err) {
-      console.warn('[LucidClip] Failed to persist settings via backend:', err);
-    }
+    await invoke('update_setting', {
+      key: 'app_settings',
+      value: JSON.stringify(this.cache),
+    });
 
     return this.cache;
   }
 
   async resetToDefaults(): Promise<AppSettings> {
     this.cache = { ...DEFAULT_SETTINGS };
-    try {
-      await invoke('update_setting', {
-        key: 'app_settings',
-        value: JSON.stringify(this.cache),
-      });
-    } catch (err) {
-      console.warn('[LucidClip] Failed to reset settings via backend:', err);
-    }
+    await invoke('update_setting', {
+      key: 'app_settings',
+      value: JSON.stringify(this.cache),
+    });
     return this.cache;
   }
 }

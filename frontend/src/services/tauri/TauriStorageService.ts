@@ -7,6 +7,8 @@ interface StorageStatsDto {
   db_size_bytes: number;
   screenshot_storage_bytes: number;
   total_storage_bytes: number;
+  entry_count: number;
+  screenshot_count: number;
 }
 
 export class TauriStorageService implements IStorageService {
@@ -16,16 +18,12 @@ export class TauriStorageService implements IStorageService {
       return {
         dbSizeBytes: stats.db_size_bytes,
         screenshotStorageBytes: stats.screenshot_storage_bytes,
-        entryCount: 0,
-        screenshotCount: 0,
+        entryCount: stats.entry_count,
+        screenshotCount: stats.screenshot_count,
       };
-    } catch {
-      return {
-        dbSizeBytes: 0,
-        screenshotStorageBytes: 0,
-        entryCount: 0,
-        screenshotCount: 0,
-      };
+    } catch (err) {
+      console.error('[LucidClip] Failed to read storage statistics:', err);
+      throw err;
     }
   }
 }

@@ -77,6 +77,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const toast = useToast();
+  const showError = toast.error;
 
   const [activeSection, setActiveSection] = useState<NavigationSection>('all');
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
@@ -97,24 +98,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshData = useCallback(async () => {
-    try {
-      const [clips, shots, currentSettings, stats] = await Promise.all([
-        clipboardService.getHistory(),
-        screenshotService.getScreenshots(),
-        settingsService.getSettings(),
-        storageService.getStorageUsage(),
-      ]);
+    const [clips, shots, currentSettings, stats] = await Promise.allSettled([
+      clipboardService.getHistory(),
+      screenshotService.getScreenshots(),
+      settingsService.getSettings(),
+      storageService.getStorageUsage(),
+    ]);
 
-      setClipboardItems(clips);
-      setScreenshotItems(shots);
-      setSettings(currentSettings);
-      setStorageStats(stats);
-    } catch (err) {
-      console.error('Failed to load application data', err);
-    } finally {
-      setIsLoading(false);
+    if (clips.status === 'fulfilled') setClipboardItems(clips.value);
+    else console.error('[LucidClip] Failed to load clipboard history', clips.reason);
+
+    if (shots.status === 'fulfilled') setScreenshotItems(shots.value);
+    else console.error('[LucidClip] Failed to load screenshots', shots.reason);
+
+    if (currentSettings.status === 'fulfilled') setSettings(currentSettings.value);
+    else console.error('[LucidClip] Failed to load settings', currentSettings.reason);
+
+    if (stats.status === 'fulfilled') setStorageStats(stats.value);
+    else console.error('[LucidClip] Failed to load storage statistics', stats.reason);
+
+    if ([clips, shots, currentSettings, stats].some((result) => result.status === 'rejected')) {
+      showError('Some local data could not be loaded.');
     }
-  }, []);
+
+    setIsLoading(false);
+  }, [showError]);
 
   useEffect(() => {
     refreshData();
@@ -318,15 +326,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
-    const updated = await settingsService.updateSettings(partial);
-    setSettings(updated);
-    toast.info('Settings saved.');
+    try {
+      const updated = await settingsService.updateSettings(partial);
+      setSettings(updated);
+      toast.info('Settings saved.');
+    } catch (err) {
+      reportActionError('Save settings', err);
+    }
   };
 
   const resetSettings = async () => {
-    const reset = await settingsService.resetToDefaults();
-    setSettings(reset);
-    toast.info('Settings reset to defaults.');
+    try {
+      const reset = await settingsService.resetToDefaults();
+      setSettings(reset);
+      toast.info('Settings reset to defaults.');
+    } catch (err) {
+      reportActionError('Reset settings', err);
+    }
   };
 
   const toggleMonitoring = async () => {
