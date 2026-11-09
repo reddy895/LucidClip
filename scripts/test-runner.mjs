@@ -42,6 +42,46 @@ describe('LucidClip Core Integrity Verification', () => {
       !shotServiceSrc.includes('INITIAL_SCREENSHOT_ENTRIES'),
       'MockScreenshotService must not load sample INITIAL_SCREENSHOT_ENTRIES'
     );
+    assert.ok(
+      !shotServiceSrc.includes('data:image/svg'),
+      'MockScreenshotService must not fabricate screenshot images'
+    );
+    assert.ok(
+      !shotServiceSrc.includes('OCR Result'),
+      'MockScreenshotService must not fabricate OCR output'
+    );
+  });
+
+  test('Screenshot IPC surface: capture, crop, copy, and export are registered', () => {
+    const libSource = fs.readFileSync(path.join(backendDir, 'src/lib.rs'), 'utf8');
+    for (const command of [
+      'commands::capture_screenshot',
+      'commands::crop_screenshot',
+      'commands::copy_screenshot_image',
+      'commands::export_screenshot',
+    ]) {
+      assert.ok(
+        libSource.includes(command),
+        `${command} must be registered in the Tauri invoke handler`
+      );
+    }
+
+    const migrationSource = fs.readFileSync(
+      path.join(backendDir, 'src/database/migrations.rs'),
+      'utf8'
+    );
+    assert.ok(
+      migrationSource.includes("ADD COLUMN capture_type"),
+      'Screenshots must persist the real capture type'
+    );
+
+    const serviceSource = fs.readFileSync(
+      path.join(rootDir, 'frontend/src/services/tauri/TauriScreenshotService.ts'),
+      'utf8'
+    );
+    for (const ipc of ["'capture_screenshot'", "'crop_screenshot'", "'copy_screenshot_image'", "'export_screenshot'"]) {
+      assert.ok(serviceSource.includes(ipc), `Tauri screenshot service must invoke ${ipc}`);
+    }
   });
 
   test('Frontend Build Output: production distribution contains index.html', () => {
