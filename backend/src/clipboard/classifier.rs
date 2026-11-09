@@ -64,10 +64,11 @@ pub fn classify_content(raw: &str) -> ClipboardContentType {
     }
 
     // 4. JSON detection
-    if (text.starts_with('{') && text.ends_with('}')) || (text.starts_with('[') && text.ends_with(']')) {
-        if serde_json::from_str::<serde_json::Value>(text).is_ok() {
-            return ClipboardContentType::Json;
-        }
+    if ((text.starts_with('{') && text.ends_with('}'))
+        || (text.starts_with('[') && text.ends_with(']')))
+        && serde_json::from_str::<serde_json::Value>(text).is_ok()
+    {
+        return ClipboardContentType::Json;
     }
 
     // 5. Code snippet detection
