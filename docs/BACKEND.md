@@ -139,7 +139,7 @@ Each capture tick:
 2. Stops while monitoring is disabled or paused.
 3. Resolves the foreground process executable and skips configured exclusions.
 4. Skips content flagged through `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory`, or `CanUploadToCloudClipboard` when password-manager protection is enabled. If the check itself fails, the tick is skipped.
-5. Reads the highest-priority supported value from one clipboard session: wide `CF_HDROP`, then 24/32-bit `CF_DIB`/`CF_DIBV5`, then `CF_UNICODETEXT` with a `CF_TEXT` ANSI fallback.
+5. Reads the highest-priority supported value from one clipboard session: wide `CF_HDROP`, then 16/24/32-bit `CF_DIB`/`CF_DIBV5`, then `CF_UNICODETEXT` with a `CF_TEXT` ANSI fallback.
 6. Rejects oversized payloads, deduplicates by a domain-separated hash, stores text/image/file metadata, applies retention, and emits the persisted entry as `clipboard://new-entry`.
 
 Malformed higher-priority formats are logged without content and fall through to lower-priority formats. The thread exits when the application sets its shutdown flag.

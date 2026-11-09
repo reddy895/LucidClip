@@ -166,7 +166,7 @@ LucidClip/
 ## Limitations
 
 - Native clipboard, capture, and startup behavior can only be fully verified on Windows.
-- Clipboard capture is Windows-only. On Windows, bitmap capture accepts uncompressed 24/32-bit `CF_DIB` data and file capture accepts wide-character `CF_HDROP` lists.
+- Clipboard capture is Windows-only. On Windows, bitmap capture accepts uncompressed 16/24/32-bit `CF_DIB` data and file capture accepts wide-character `CF_HDROP` lists.
 - Linux clipboard monitoring remains unsupported; the UI reports this limitation instead of fabricating entries.
 - Cross-compiling the full backend on Linux is blocked by the bundled SQLite build needing a MinGW C compiler; Windows-only modules are checked separately with the GNU target.
 - OCR and global shortcut behavior remain roadmap items rather than shipped features.

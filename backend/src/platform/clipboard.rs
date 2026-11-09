@@ -584,7 +584,7 @@ fn parse_dib(data: &[u8]) -> Result<CapturedImage> {
             "Windows returned invalid bitmap dimensions".into(),
         ));
     }
-    if compression != 0 || !matches!(bit_count, 24 | 32) {
+    if compression != 0 || !matches!(bit_count, 16 | 24 | 32) {
         return Err(AppError::Clipboard(format!(
             "Unsupported clipboard bitmap (compression {compression}, {bit_count} bpp)"
         )));
@@ -629,9 +629,16 @@ fn parse_dib(data: &[u8]) -> Result<CapturedImage> {
         for column in 0..width as usize {
             let source_index = header_size + source_row * row_stride + column * bytes_per_pixel;
             let target_index = (row * width as usize + column) * 4;
-            rgba[target_index] = data[source_index + 2];
-            rgba[target_index + 1] = data[source_index + 1];
-            rgba[target_index + 2] = data[source_index];
+            if bit_count == 16 {
+                let pixel = u16::from_le_bytes([data[source_index], data[source_index + 1]]);
+                rgba[target_index] = (((pixel >> 10) & 0x1f) as u32 * 255 / 31) as u8;
+                rgba[target_index + 1] = (((pixel >> 5) & 0x1f) as u32 * 255 / 31) as u8;
+                rgba[target_index + 2] = ((pixel & 0x1f) as u32 * 255 / 31) as u8;
+            } else {
+                rgba[target_index] = data[source_index + 2];
+                rgba[target_index + 1] = data[source_index + 1];
+                rgba[target_index + 2] = data[source_index];
+            }
             rgba[target_index + 3] = 255;
         }
     }
@@ -762,6 +769,26 @@ mod tests {
     fn parses_top_down_24_bit_bitmap() {
         let image = parse_dib(&dib_2x2_top_down()).unwrap();
         assert_eq!((image.width, image.height), (2, 2));
+        assert_eq!(&image.rgba[0..4], &[255, 0, 0, 255]);
+        assert_eq!(&image.rgba[4..8], &[0, 255, 0, 255]);
+        assert_eq!(&image.rgba[8..12], &[0, 0, 255, 255]);
+        assert_eq!(&image.rgba[12..16], &[255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn parses_16_bit_rgb555_bitmap() {
+        let mut data = vec![0u8; 40];
+        data[0..4].copy_from_slice(&40u32.to_le_bytes());
+        data[4..8].copy_from_slice(&2i32.to_le_bytes());
+        data[8..12].copy_from_slice(&(-2i32).to_le_bytes());
+        data[12..14].copy_from_slice(&1u16.to_le_bytes());
+        data[14..16].copy_from_slice(&16u16.to_le_bytes());
+        for pixel in [0x7c00u16, 0x03e0, 0x001f, 0x7fff] {
+            data.extend_from_slice(&pixel.to_le_bytes());
+        }
+        data.extend_from_slice(&[0, 0, 0, 0]);
+
+        let image = parse_dib(&data).unwrap();
         assert_eq!(&image.rgba[0..4], &[255, 0, 0, 255]);
         assert_eq!(&image.rgba[4..8], &[0, 255, 0, 255]);
         assert_eq!(&image.rgba[8..12], &[0, 0, 255, 255]);
