@@ -7,8 +7,8 @@ const SETTINGS_STORAGE_KEY = 'lucidclip_app_settings';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   general: {
-    launchOnStartup: true,
-    minimizeToTray: true,
+    launchOnStartup: false,
+    minimizeToTray: false,
     theme: 'dark',
     defaultView: 'all',
   },

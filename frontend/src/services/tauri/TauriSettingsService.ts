@@ -20,7 +20,7 @@ export class TauriSettingsService implements ISettingsService {
   }
 
   async updateSettings(partial: Partial<AppSettings>): Promise<AppSettings> {
-    this.cache = {
+    const next: AppSettings = {
       ...this.cache,
       ...partial,
       general: { ...this.cache.general, ...(partial.general || {}) },
@@ -32,9 +32,10 @@ export class TauriSettingsService implements ISettingsService {
 
     await invoke('update_setting', {
       key: 'app_settings',
-      value: JSON.stringify(this.cache),
+      value: JSON.stringify(next),
     });
 
+    this.cache = next;
     return this.cache;
   }
 

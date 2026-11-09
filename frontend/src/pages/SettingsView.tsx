@@ -124,7 +124,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex flex-col">
               <SettingsSection
                 title="System Integration"
-                description="Controls how LucidClip interacts with Windows startup and system tray."
+                description="Controls how LucidClip starts with Windows."
               >
                 <div className="flex items-center justify-between py-1">
                   <div>
@@ -132,30 +132,13 @@ export const SettingsView: React.FC = () => {
                       Launch at Windows startup
                     </div>
                     <div className="text-[11px] text-graphite-text-muted">
-                      Start LucidClip minimized in the background on user login.
+                      Register LucidClip to launch when the current Windows user signs in.
                     </div>
                   </div>
                   <Toggle
                     checked={settings.general.launchOnStartup}
                     onChange={(checked) =>
                       updateSettings({ general: { ...settings.general, launchOnStartup: checked } })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Minimize to system tray
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Closing the window keeps the application running in the notification area.
-                    </div>
-                  </div>
-                  <Toggle
-                    checked={settings.general.minimizeToTray}
-                    onChange={(checked) =>
-                      updateSettings({ general: { ...settings.general, minimizeToTray: checked } })
                     }
                   />
                 </div>
