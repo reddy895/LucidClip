@@ -45,6 +45,37 @@ pub fn copy_clipboard_entry(content: String) -> Result<bool> {
 }
 
 #[tauri::command]
+pub fn copy_clipboard_entry_by_id(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
+    let entry = service
+        .get_entry_by_id(&id)?
+        .ok_or_else(|| AppError::NotFound(format!("Clipboard entry {id} not found")))?;
+
+    match entry.content_type.as_str() {
+        "image" => {
+            let path = entry.image_path.as_deref().ok_or_else(|| {
+                AppError::Clipboard(format!("Clipboard image {id} has no stored file"))
+            })?;
+            let image = image::open(path)?.to_rgba8();
+            crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
+        }
+        "files" => {
+            let files: Vec<String> = entry
+                .content
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .map(str::to_string)
+                .collect();
+            crate::platform::set_clipboard_files(&files)?;
+        }
+        _ => crate::platform::set_clipboard_text(&entry.content)?,
+    }
+
+    Ok(true)
+}
+
+#[tauri::command]
 pub fn delete_clipboard_entry(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
     let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.delete_entry(&id)

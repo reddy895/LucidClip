@@ -170,7 +170,7 @@ impl<'a> ClipboardService<'a> {
 
         let entry_id = format!("clip_{}_{}", now, &content_hash[..8]);
         let file_count = unique.len();
-        let content_type = if file_count == 1 { "path" } else { "files" };
+        let content_type = "files";
 
         let new_entry = DbClipboardEntry {
             id: entry_id,

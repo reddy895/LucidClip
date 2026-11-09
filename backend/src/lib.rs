@@ -170,6 +170,7 @@ pub fn run() {
             commands::get_clipboard_entries,
             commands::add_clipboard_entry,
             commands::copy_clipboard_entry,
+            commands::copy_clipboard_entry_by_id,
             commands::delete_clipboard_entry,
             commands::toggle_clipboard_pin,
             commands::toggle_clipboard_favorite,

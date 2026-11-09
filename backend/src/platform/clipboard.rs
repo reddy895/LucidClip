@@ -12,9 +12,11 @@ pub enum ClipboardSnapshot {
 }
 
 /// Maximum decoded image bytes accepted from another process.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const MAX_IMAGE_BYTES: usize = 128 * 1024 * 1024;
 
 /// Maximum number of file references accepted from one clipboard value.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const MAX_FILE_COUNT: usize = 10_000;
 
 #[cfg(target_os = "windows")]
@@ -32,7 +34,7 @@ mod windows_clipboard {
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
 
-    use super::{parse_dib, parse_file_list, ClipboardSnapshot};
+    use super::{build_dropfiles, parse_dib, parse_file_list, ClipboardSnapshot};
     use crate::errors::{AppError, Result};
     use crate::platform::CapturedImage;
 
@@ -211,6 +213,50 @@ mod windows_clipboard {
         Ok(())
     }
 
+    pub fn write_files(files: &[String]) -> Result<()> {
+        let data = build_dropfiles(files)?;
+        let _session = ClipboardSession::open()?;
+
+        if unsafe { EmptyClipboard() } == 0 {
+            return Err(AppError::Clipboard(format!(
+                "Failed to empty the Windows clipboard (error {})",
+                unsafe { GetLastError() }
+            )));
+        }
+
+        let handle: HGLOBAL = unsafe { GlobalAlloc(GMEM_MOVEABLE, data.len()) };
+        if handle.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to allocate memory for the file list".into(),
+            ));
+        }
+
+        let destination = unsafe { GlobalLock(handle) } as *mut u8;
+        if destination.is_null() {
+            unsafe {
+                GlobalFree(handle);
+            }
+            return Err(AppError::Clipboard(
+                "Failed to lock clipboard memory".into(),
+            ));
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(data.as_ptr(), destination, data.len());
+            GlobalUnlock(handle);
+
+            if SetClipboardData(CF_HDROP, handle).is_null() {
+                let error = GetLastError();
+                GlobalFree(handle);
+                return Err(AppError::Clipboard(format!(
+                    "Failed to set Windows clipboard files (error {error})"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Check the standard Windows opt-out formats that password managers and
     /// other sensitive applications use to exclude clipboard contents.
     pub fn content_is_sensitive() -> Result<bool> {
@@ -369,6 +415,36 @@ mod windows_clipboard {
     }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn build_dropfiles(files: &[String]) -> Result<Vec<u8>> {
+    if files.is_empty() {
+        return Err(AppError::InvalidInput(
+            "At least one file path is required".into(),
+        ));
+    }
+    if files.iter().any(|file| file.contains('\0')) {
+        return Err(AppError::InvalidInput(
+            "File paths cannot contain null characters".into(),
+        ));
+    }
+
+    let mut paths = String::new();
+    for file in files {
+        paths.push_str(file);
+        paths.push('\0');
+    }
+    paths.push('\0');
+
+    let mut data = vec![0u8; 20];
+    data[0..4].copy_from_slice(&20u32.to_le_bytes());
+    data[16..20].copy_from_slice(&1u32.to_le_bytes());
+    for unit in paths.encode_utf16() {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    Ok(data)
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn parse_file_list(data: &[u8]) -> Result<Vec<String>> {
     if data.len() < 20 {
         return Err(AppError::Clipboard(
@@ -414,6 +490,7 @@ fn parse_file_list(data: &[u8]) -> Result<Vec<String>> {
     Ok(files)
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn parse_dib(data: &[u8]) -> Result<CapturedImage> {
     if data.len() < 40 {
         return Err(AppError::Clipboard(
@@ -454,7 +531,7 @@ fn parse_dib(data: &[u8]) -> Result<CapturedImage> {
         ));
     }
 
-    let row_stride = ((width as usize * bit_count as usize + 31) / 32) * 4;
+    let row_stride = (width as usize * bit_count as usize).div_ceil(32) * 4;
     let pixel_bytes = row_stride
         .checked_mul(height as usize)
         .ok_or_else(|| AppError::Clipboard("Clipboard bitmap size overflowed".into()))?;
@@ -526,6 +603,22 @@ pub fn set_clipboard_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
         let _ = (rgba, width, height);
         Err(AppError::Clipboard(
             "Copying images is only available on Windows".into(),
+        ))
+    }
+}
+
+/// Write file references so Explorer and other applications can paste them.
+pub fn set_clipboard_files(files: &[String]) -> Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_clipboard::write_files(files)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = files;
+        Err(AppError::Clipboard(
+            "Copying files is only available on Windows".into(),
         ))
     }
 }
@@ -630,6 +723,17 @@ mod tests {
         assert_eq!(
             parse_file_list(&data).unwrap(),
             vec!["C:\\Work\\a.txt".to_string(), "D:\\b.txt".to_string()]
+        );
+    }
+
+    #[test]
+    fn builds_wide_dropfile_header_and_paths() {
+        let data = build_dropfiles(&["C:\\a.txt".into(), "D:\\b.txt".into()]).unwrap();
+        assert_eq!(&data[0..4], &20u32.to_le_bytes());
+        assert_eq!(&data[16..20], &1u32.to_le_bytes());
+        assert_eq!(
+            parse_file_list(&data).unwrap(),
+            vec!["C:\\a.txt", "D:\\b.txt"]
         );
     }
 
