@@ -152,7 +152,8 @@ Screenshot deletion removes the SQLite row before unlinking files. A failed unli
 
 ## 12. Retention, Exclusions, and Startup
 
-- Retention deletes unpinned, non-favorite entries beyond the configured count or age after each capture and at startup.
+- Retention deletes unpinned, non-favorite entries beyond the configured count or age after each capture and at startup. Startup retention uses the configured paths so removed media files are cleaned too.
+- Startup orphan cleanup removes `clip_*.png` files absent from the clipboard table while leaving `shot_*.png` screenshot files untouched.
 - Exclusions compare the foreground executable name case-insensitively.
 - Launch at login writes or removes the current executable under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LucidClip`.
 - Settings updates synchronize the registry entry before persisting, so a registry failure is reported instead of claiming success.

@@ -1,6 +1,7 @@
 //! Clipboard Service coordinating classification, deduplication, and persistence
 
 use std::collections::HashSet;
+use std::fs;
 
 use crate::clipboard::classifier::classify_content;
 use crate::clipboard::hasher::{hash_bytes, hash_content};
@@ -233,6 +234,63 @@ impl<'a> ClipboardService<'a> {
         Ok(removed)
     }
 
+    /// Remove clipboard media files that no longer belong to a database row.
+    ///
+    /// Only files named like clipboard captures are considered, so screenshot
+    /// originals and unrelated files in the shared directories are untouched.
+    pub fn cleanup_orphaned_media(&self) -> Result<usize> {
+        let Some(paths) = self.paths else {
+            return Ok(0);
+        };
+
+        let entries = self.repo.list_all()?;
+        let referenced: HashSet<String> = entries
+            .into_iter()
+            .flat_map(|entry| [entry.image_path, entry.thumbnail_path])
+            .flatten()
+            .collect();
+
+        let mut removed = 0;
+        for directory in [&paths.originals_dir, &paths.thumbnails_dir] {
+            let listing = match fs::read_dir(directory) {
+                Ok(listing) => listing,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(err) => {
+                    eprintln!(
+                        "[LucidClip Clipboard] Could not scan media directory {}: {err}",
+                        directory.display()
+                    );
+                    continue;
+                }
+            };
+
+            for item in listing.flatten() {
+                let path = item.path();
+                let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                if !name.starts_with("clip_") || !name.ends_with(".png") {
+                    continue;
+                }
+                let path_text = path.to_string_lossy();
+                if referenced.contains(path_text.as_ref()) {
+                    continue;
+                }
+
+                match fs::remove_file(&path) {
+                    Ok(()) => removed += 1,
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => eprintln!(
+                        "[LucidClip Clipboard] Failed to remove orphan media {}: {err}",
+                        path.display()
+                    ),
+                }
+            }
+        }
+
+        Ok(removed)
+    }
+
     fn remove_deleted_media(&self, before: Vec<DbClipboardEntry>, removed: usize) {
         let Some(paths) = self.paths else {
             return;
@@ -332,6 +390,46 @@ mod tests {
             .unwrap();
         assert_eq!(again.id, entry.id);
         assert_eq!(service.get_history().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn orphan_cleanup_removes_only_unreferenced_clipboard_media() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-orphans-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let orphan = paths.originals_dir.join("clip_orphan.png");
+        let screenshot = paths.originals_dir.join("shot_keep.png");
+        fs::write(&orphan, b"orphan").unwrap();
+        fs::write(&screenshot, b"screenshot").unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ClipboardService::with_paths(&pool, &paths);
+        let image = CapturedImage {
+            rgba: vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            width: 2,
+            height: 2,
+        };
+        let entry = service.process_copied_image(image, None).unwrap();
+        let original = entry.image_path.clone().unwrap();
+        let thumbnail = entry.thumbnail_path.clone().unwrap();
+
+        assert_eq!(service.cleanup_orphaned_media().unwrap(), 1);
+        assert!(!orphan.exists());
+        assert!(screenshot.exists());
+        assert!(std::path::Path::new(&original).exists());
+        assert!(std::path::Path::new(&thumbnail).exists());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

@@ -138,13 +138,20 @@ pub fn run() {
                 }
             }
 
-            let service = clipboard::ClipboardService::new(&pool);
+            let service = clipboard::ClipboardService::with_paths(&pool, &paths);
             match service.enforce_retention() {
                 Ok(removed) if removed > 0 => {
                     println!("[LucidClip] Purged {removed} clipboard entries by retention policy.");
                 }
                 Ok(_) => {}
                 Err(err) => eprintln!("[LucidClip] Startup retention cleanup failed: {err}"),
+            }
+            match service.cleanup_orphaned_media() {
+                Ok(removed) if removed > 0 => {
+                    println!("[LucidClip] Removed {removed} orphaned clipboard media files.");
+                }
+                Ok(_) => {}
+                Err(err) => eprintln!("[LucidClip] Orphan media cleanup failed: {err}"),
             }
 
             let monitor_stop = Arc::new(AtomicBool::new(false));

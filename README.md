@@ -28,6 +28,7 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 - Honors configurable maximum entry counts and cleanup age; pinned and favorite entries are preserved.
 - Skips configured source applications and clipboard contents marked sensitive by Windows opt-out formats.
 - Emits the persisted entry so the UI updates immediately; deleting or clearing entries also removes their media files.
+- Removes orphaned clipboard media left by a crash on the next startup without touching screenshot files.
 
 ### Screenshots
 
