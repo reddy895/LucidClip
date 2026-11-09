@@ -258,6 +258,36 @@ mod windows_clipboard {
             }
         }
 
+        // Explorer and other drop targets consult Preferred DropEffect to
+        // decide whether a paste or drag should copy rather than move.
+        let effect_format = register_format("Preferred DropEffect");
+        if effect_format != 0 {
+            let effect: HGLOBAL = unsafe { GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>()) };
+            if effect.is_null() {
+                eprintln!("[LucidClip Clipboard] Could not allocate the copy drop effect.");
+                return Ok(());
+            }
+            let destination = unsafe { GlobalLock(effect) } as *mut u32;
+            if destination.is_null() {
+                unsafe {
+                    GlobalFree(effect);
+                }
+                eprintln!("[LucidClip Clipboard] Could not lock the copy drop effect.");
+                return Ok(());
+            }
+            unsafe {
+                *destination = 1; // DROPEFFECT_COPY
+                GlobalUnlock(effect);
+                if SetClipboardData(effect_format, effect).is_null() {
+                    let error = GetLastError();
+                    GlobalFree(effect);
+                    eprintln!(
+                        "[LucidClip Clipboard] Could not set the copy drop effect (error {error})."
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 

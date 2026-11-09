@@ -121,7 +121,7 @@ No screenshot directory outside the application data root is exposed to the webv
 
 ## 8. Clipboard Restoration
 
-`copy_clipboard_entry` writes plain text through `backend/src/platform/clipboard.rs`. `copy_clipboard_entry_by_id` loads the stored entry type and restores text, a stored PNG as 32-bit bottom-up `CF_DIB` image data, or a stored path list as a wide-character `CF_HDROP` buffer.
+`copy_clipboard_entry` writes plain text through `backend/src/platform/clipboard.rs`. `copy_clipboard_entry_by_id` loads the stored entry type and restores text, a stored PNG as 32-bit bottom-up `CF_DIB` image data, or a stored path list as a wide-character `CF_HDROP` buffer with a `Preferred DropEffect` copy marker.
 
 On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData`. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts return an explicit unsupported error.
 
