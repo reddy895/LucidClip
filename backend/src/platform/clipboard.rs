@@ -522,7 +522,7 @@ fn parse_file_list(data: &[u8]) -> Result<Vec<String>> {
 
     let offset = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
     let wide = u32::from_le_bytes(data[16..20].try_into().unwrap()) != 0;
-    if offset >= data.len() {
+    if offset < 20 || offset >= data.len() || !offset.is_multiple_of(2) {
         return Err(AppError::Clipboard(
             "Windows returned an invalid file list offset".into(),
         ));
@@ -775,6 +775,37 @@ mod tests {
         assert_eq!(&image.rgba[12..16], &[255, 255, 255, 255]);
     }
 
+    fn dib_2x2_bottom_up() -> Vec<u8> {
+        let mut data = vec![0u8; 40];
+        data[0..4].copy_from_slice(&40u32.to_le_bytes());
+        data[4..8].copy_from_slice(&2i32.to_le_bytes());
+        data[8..12].copy_from_slice(&2i32.to_le_bytes());
+        data[12..14].copy_from_slice(&1u16.to_le_bytes());
+        data[14..16].copy_from_slice(&24u16.to_le_bytes());
+        data.extend_from_slice(&[
+            255, 0, 0, 255, 255, 255, 0, 0, // bottom row: blue, white + padding
+            0, 0, 255, 0, 255, 0, 0, 0, // top row: red, green + padding
+        ]);
+        data
+    }
+
+    #[test]
+    fn parses_bottom_up_and_v5_bitmaps() {
+        let bottom_up = parse_dib(&dib_2x2_bottom_up()).unwrap();
+        assert_eq!(&bottom_up.rgba[0..4], &[255, 0, 0, 255]);
+        assert_eq!(&bottom_up.rgba[12..16], &[255, 255, 255, 255]);
+
+        let mut v5 = vec![0u8; 124];
+        v5[0..4].copy_from_slice(&124u32.to_le_bytes());
+        v5[4..8].copy_from_slice(&1i32.to_le_bytes());
+        v5[8..12].copy_from_slice(&(-1i32).to_le_bytes());
+        v5[12..14].copy_from_slice(&1u16.to_le_bytes());
+        v5[14..16].copy_from_slice(&32u16.to_le_bytes());
+        v5.extend_from_slice(&[10, 20, 30, 255]);
+        let image = parse_dib(&v5).unwrap();
+        assert_eq!(&image.rgba[0..4], &[30, 20, 10, 255]);
+    }
+
     #[test]
     fn parses_16_bit_rgb555_bitmap() {
         let mut data = vec![0u8; 40];
@@ -837,5 +868,15 @@ mod tests {
         let mut data = vec![0u8; 20];
         data[0..4].copy_from_slice(&20u32.to_le_bytes());
         assert!(parse_file_list(&data).is_err());
+
+        let mut inside_header = vec![0u8; 24];
+        inside_header[0..4].copy_from_slice(&18u32.to_le_bytes());
+        inside_header[16..20].copy_from_slice(&1u32.to_le_bytes());
+        assert!(parse_file_list(&inside_header).is_err());
+
+        let mut odd = vec![0u8; 24];
+        odd[0..4].copy_from_slice(&21u32.to_le_bytes());
+        odd[16..20].copy_from_slice(&1u32.to_le_bytes());
+        assert!(parse_file_list(&odd).is_err());
     }
 }
