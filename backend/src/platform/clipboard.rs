@@ -284,12 +284,10 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        // Non-Windows hosts are development-only for LucidClip.
-        println!(
-            "[LucidClip Platform] Clipboard write skipped on this host ({} characters)",
-            text.len()
-        );
-        Ok(())
+        let _ = text;
+        Err(crate::errors::AppError::Clipboard(
+            "Clipboard writing is only available on Windows".into(),
+        ))
     }
 }
 

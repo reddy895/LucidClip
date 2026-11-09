@@ -218,25 +218,14 @@ pub fn update_setting(key: String, value: String, state: tauri::State<'_, AppSta
 
 #[tauri::command]
 pub fn get_storage_stats(state: tauri::State<'_, AppState>) -> Result<StorageStatsDto> {
-    let db_size_bytes = fs::metadata(&state.paths.database_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let db_size_bytes = match fs::metadata(&state.paths.database_path) {
+        Ok(metadata) => metadata.len(),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => 0,
+        Err(err) => return Err(err.into()),
+    };
 
-    let mut screenshot_storage_bytes = 0;
-    if let Ok(entries) = fs::read_dir(&state.paths.originals_dir) {
-        for entry in entries.flatten() {
-            if let Ok(meta) = entry.metadata() {
-                screenshot_storage_bytes += meta.len();
-            }
-        }
-    }
-    if let Ok(entries) = fs::read_dir(&state.paths.thumbnails_dir) {
-        for entry in entries.flatten() {
-            if let Ok(meta) = entry.metadata() {
-                screenshot_storage_bytes += meta.len();
-            }
-        }
-    }
+    let screenshot_storage_bytes = directory_size(&state.paths.originals_dir)?
+        + directory_size(&state.paths.thumbnails_dir)?;
 
     let entry_count = crate::database::ClipboardRepo::new(&state.pool).count()?;
     let screenshot_count = crate::database::ScreenshotRepo::new(&state.pool).count()?;
@@ -248,4 +237,29 @@ pub fn get_storage_stats(state: tauri::State<'_, AppState>) -> Result<StorageSta
         entry_count,
         screenshot_count,
     })
+}
+
+fn directory_size(path: &std::path::Path) -> Result<u64> {
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(err) => return Err(err.into()),
+    };
+
+    let mut total = 0u64;
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(err.into()),
+        };
+
+        match entry.metadata() {
+            Ok(metadata) => total += metadata.len(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(err.into()),
+        }
+    }
+
+    Ok(total)
 }
