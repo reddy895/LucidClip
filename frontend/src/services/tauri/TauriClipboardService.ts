@@ -1,6 +1,6 @@
 //! Tauri Native Clipboard Service Implementation
 
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { IClipboardService } from '../contracts';
 import { ClipboardContentType, ClipboardEntry } from '@/types';
 
@@ -13,6 +13,12 @@ interface DbClipboardDto {
   content_hash: string;
   pinned: boolean;
   favorite: boolean;
+  image_path?: string;
+  thumbnail_path?: string;
+  image_width?: number;
+  image_height?: number;
+  byte_size?: number;
+  file_count?: number;
 }
 
 function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
@@ -23,7 +29,9 @@ function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
 
   let contentType: ClipboardContentType = 'text';
   if (
-    ['multiline', 'code', 'url', 'json', 'color_code', 'path'].includes(dto.content_type)
+    ['multiline', 'code', 'url', 'json', 'color_code', 'path', 'image', 'files'].includes(
+      dto.content_type
+    )
   ) {
     contentType = dto.content_type as ClipboardContentType;
   }
@@ -36,6 +44,14 @@ function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
     wordCount,
     lineCount,
     sourceApp: dto.source_app,
+    imagePath: dto.image_path,
+    thumbnailPath: dto.thumbnail_path,
+    imageUrl: dto.image_path ? convertFileSrc(dto.image_path) : undefined,
+    thumbnailUrl: dto.thumbnail_path ? convertFileSrc(dto.thumbnail_path) : undefined,
+    imageWidth: dto.image_width,
+    imageHeight: dto.image_height,
+    byteSize: dto.byte_size,
+    fileCount: dto.file_count,
     isPinned: dto.pinned,
     isFavorite: dto.favorite,
     createdAt: iso,
@@ -56,6 +72,10 @@ export class TauriClipboardService implements IClipboardService {
 
   async copyToClipboard(content: string): Promise<boolean> {
     return await invoke<boolean>('copy_clipboard_entry', { content });
+  }
+
+  async copyEntryById(id: string): Promise<boolean> {
+    return await invoke<boolean>('copy_clipboard_entry_by_id', { id });
   }
 
   async togglePin(id: string): Promise<ClipboardEntry> {

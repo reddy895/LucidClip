@@ -62,6 +62,8 @@ export const ClipboardView: React.FC = () => {
     { id: 'json', label: 'JSON' },
     { id: 'color_code', label: 'Colors' },
     { id: 'path', label: 'Paths' },
+    { id: 'image', label: 'Images' },
+    { id: 'files', label: 'Files' },
   ];
 
   return (
@@ -104,7 +106,7 @@ export const ClipboardView: React.FC = () => {
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Search clipboard snippets, code, commands..."
+            placeholder="Search clipboard text, code, paths, files..."
             shortcutBadge="/"
           />
         </div>
@@ -135,7 +137,7 @@ export const ClipboardView: React.FC = () => {
             <EmptyState
               icon={<ClipboardList className="h-5 w-5" />}
               title="No clipboard entries yet."
-              description="Copy text, commands, or links in any application and they will appear here automatically."
+              description="Copy text, links, images, or files in any application and they will appear here automatically."
             />
           )
         ) : (

@@ -3,7 +3,7 @@ import { HistoryItem } from '@/types';
 import { cn, formatRelativeTime, truncate } from '@/utils';
 import { Badge } from '@/components/ui';
 import { HighlightText } from '@/components/search';
-import { FileText, Code, Link as LinkIcon, Camera, Pin, Star } from 'lucide-react';
+import { FileText, Code, Link as LinkIcon, Camera, Pin, Star, Image as ImageIcon, Files } from 'lucide-react';
 
 export interface QuickAccessItemProps {
   item: HistoryItem;
@@ -30,13 +30,19 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
     json: { label: 'JSON', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
     color_code: { label: 'COLOR', icon: <FileText className="h-3 w-3" />, variant: 'accent' as const },
     path: { label: 'PATH', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
+    image: { label: 'IMG', icon: <ImageIcon className="h-3 w-3" />, variant: 'accent' as const },
+    files: { label: 'FILES', icon: <Files className="h-3 w-3" />, variant: 'default' as const },
     screenshot: { label: 'IMG', icon: <Camera className="h-3 w-3" />, variant: 'default' as const },
   };
 
   const currentType = isClipboard ? typeConfig[item.contentType] : typeConfig.screenshot;
 
   const previewText = isClipboard
-    ? item.content.replace(/\s+/g, ' ').trim()
+    ? item.contentType === 'image'
+      ? `${item.imageWidth ?? '?'} × ${item.imageHeight ?? '?'} image`
+      : item.contentType === 'files'
+      ? `${item.fileCount ?? 0} file${(item.fileCount ?? 0) === 1 ? '' : 's'}`
+      : item.content.replace(/\s+/g, ' ').trim()
     : item.ocrText
     ? item.ocrText.replace(/\s+/g, ' ').trim()
     : `${item.width} × ${item.height} ${item.captureType} screenshot`;

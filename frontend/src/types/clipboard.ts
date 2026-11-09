@@ -5,7 +5,9 @@ export type ClipboardContentType =
   | 'json'
   | 'multiline'
   | 'color_code'
-  | 'path';
+  | 'path'
+  | 'image'
+  | 'files';
 
 export interface ClipboardEntry {
   id: string;
@@ -17,6 +19,14 @@ export interface ClipboardEntry {
   lineCount: number;
   sourceApp?: string;
   sourceAppIcon?: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  byteSize?: number;
+  fileCount?: number;
   isPinned: boolean;
   isFavorite: boolean;
   createdAt: string; // ISO 8601

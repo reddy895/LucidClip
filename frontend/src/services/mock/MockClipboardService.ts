@@ -47,6 +47,12 @@ export class MockClipboardService implements IClipboardService {
     return Promise.resolve(found ? { ...found } : null);
   }
 
+  async copyEntryById(id: string): Promise<boolean> {
+    const entry = this.entries.find((item) => item.id === id);
+    if (!entry) return false;
+    return this.copyToClipboard(entry.content);
+  }
+
   async copyToClipboard(content: string): Promise<boolean> {
     return copyTextToClipboard(content);
   }

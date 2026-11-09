@@ -13,6 +13,8 @@ import {
   Link as LinkIcon,
   Camera,
   ExternalLink,
+  Image as ImageIcon,
+  Files,
 } from 'lucide-react';
 import { useApp } from '@/context';
 
@@ -47,13 +49,21 @@ export const UnifiedHistoryRow: React.FC<UnifiedHistoryRowProps> = ({
     json: { label: 'JSON', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
     color_code: { label: 'COLOR', icon: <FileText className="h-3 w-3" />, variant: 'accent' as const },
     path: { label: 'PATH', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
+    image: { label: 'IMG', icon: <ImageIcon className="h-3 w-3" />, variant: 'accent' as const },
+    files: { label: 'FILES', icon: <Files className="h-3 w-3" />, variant: 'default' as const },
     screenshot: { label: 'IMG', icon: <Camera className="h-3 w-3" />, variant: 'default' as const },
   };
 
   const currentType = isClipboard ? typeConfig[item.contentType] : typeConfig.screenshot;
 
   const previewText = isClipboard
-    ? item.content.replace(/\s+/g, ' ').trim()
+    ? item.contentType === 'image'
+      ? `${item.imageWidth ?? '?'} × ${item.imageHeight ?? '?'} image`
+      : item.contentType === 'files'
+      ? `${item.fileCount ?? 0} file${(item.fileCount ?? 0) === 1 ? '' : 's'}: ${item.content
+          .replace(/\s+/g, ' ')
+          .trim()}`
+      : item.content.replace(/\s+/g, ' ').trim()
     : item.ocrText
     ? item.ocrText.replace(/\s+/g, ' ').trim()
     : `${item.width} × ${item.height} ${item.captureType} screenshot`;
@@ -116,11 +126,11 @@ export const UnifiedHistoryRow: React.FC<UnifiedHistoryRowProps> = ({
       >
         {/* Left: Thumbnail/Type Badge + Content Preview */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {!isClipboard ? (
+          {!isClipboard || (item.contentType === 'image' && item.thumbnailUrl) ? (
             <div className="relative h-6 w-9 shrink-0 overflow-hidden rounded-[3px] border border-graphite-border bg-[#151719]">
               <img
                 src={item.thumbnailUrl}
-                alt="Screenshot thumbnail"
+                alt={isClipboard ? 'Clipboard image thumbnail' : 'Screenshot thumbnail'}
                 className="h-full w-full object-cover"
                 loading="lazy"
               />

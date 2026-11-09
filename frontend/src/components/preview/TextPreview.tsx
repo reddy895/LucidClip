@@ -1,6 +1,6 @@
 import React from 'react';
 import { ClipboardEntry, HistoryItem } from '@/types';
-import { formatFullDateTime, formatRelativeTime } from '@/utils';
+import { formatBytes, formatFullDateTime, formatRelativeTime } from '@/utils';
 import { Badge, Button, Tooltip } from '@/components/ui';
 import { CodeSnippetPreview } from '@/components/clipboard/CodeSnippetPreview';
 import { UrlPreview } from '@/components/clipboard/UrlPreview';
@@ -88,7 +88,25 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
             Content
           </span>
 
-          {entry.contentType === 'code' ? (
+          {entry.contentType === 'image' ? (
+            <div className="rounded-btn border border-graphite-border bg-[#151719] p-2">
+              {entry.imageUrl ? (
+                <img
+                  src={entry.imageUrl}
+                  alt="Clipboard preview"
+                  className="mx-auto max-h-[420px] w-auto rounded-[3px] object-contain"
+                />
+              ) : (
+                <p className="p-3 text-xs text-status-error">
+                  The stored image file is unavailable.
+                </p>
+              )}
+            </div>
+          ) : entry.contentType === 'files' ? (
+            <div className="rounded-btn bg-[#151719] border border-graphite-border p-3 text-xs leading-relaxed text-[#F3F4F6] font-mono whitespace-pre-wrap break-all selectable-text">
+              {entry.content}
+            </div>
+          ) : entry.contentType === 'code' ? (
             <CodeSnippetPreview code={entry.content} language={entry.language} />
           ) : entry.contentType === 'url' ? (
             <UrlPreview url={entry.content} />
@@ -106,25 +124,54 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
           </span>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
-              <Hash className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
-              <div>
-                <div className="text-[10px] text-graphite-text-muted">Characters</div>
-                <div className="font-mono font-medium text-graphite-text-primary">
-                  {entry.charCount}
+            {entry.contentType === 'image' ? (
+              <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
+                <Hash className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
+                <div>
+                  <div className="text-[10px] text-graphite-text-muted">Dimensions</div>
+                  <div className="font-mono font-medium text-graphite-text-primary">
+                    {entry.imageWidth ?? '?'} × {entry.imageHeight ?? '?'}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
+                  <Hash className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-graphite-text-muted">Characters</div>
+                    <div className="font-mono font-medium text-graphite-text-primary">
+                      {entry.charCount}
+                    </div>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
-              <AlignLeft className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
-              <div>
-                <div className="text-[10px] text-graphite-text-muted">Words / Lines</div>
-                <div className="font-mono font-medium text-graphite-text-primary">
-                  {entry.wordCount}w / {entry.lineCount}L
+                <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
+                  <AlignLeft className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-graphite-text-muted">Words / Lines</div>
+                    <div className="font-mono font-medium text-graphite-text-primary">
+                      {entry.wordCount}w / {entry.lineCount}L
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {entry.contentType === 'image' || entry.contentType === 'files' ? (
+              <div className="flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">
+                <Hash className="h-3.5 w-3.5 text-graphite-text-muted shrink-0" />
+                <div>
+                  <div className="text-[10px] text-graphite-text-muted">
+                    {entry.contentType === 'files' ? 'Files / Size' : 'Size'}
+                  </div>
+                  <div className="font-mono font-medium text-graphite-text-primary">
+                    {entry.contentType === 'files' && `${entry.fileCount ?? 0} / `}
+                    {typeof entry.byteSize === 'number' ? formatBytes(entry.byteSize) : 'Unknown'}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             {entry.sourceApp && (
               <div className="col-span-2 flex items-center gap-2 rounded-btn bg-graphite-surface p-2 border border-graphite-border-subtle">

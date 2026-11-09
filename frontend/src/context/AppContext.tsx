@@ -175,7 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const copyItem = async (item: HistoryItem): Promise<boolean> => {
     try {
       if (item.kind === 'clipboard') {
-        const success = await clipboardService.copyToClipboard(item.content);
+        const success = await clipboardService.copyEntryById(item.id);
         if (success) {
           toast.success('Copied to clipboard.');
         } else {

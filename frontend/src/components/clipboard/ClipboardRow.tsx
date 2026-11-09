@@ -12,6 +12,8 @@ import {
   Code,
   Link as LinkIcon,
   ExternalLink,
+  Image as ImageIcon,
+  Files,
 } from 'lucide-react';
 import { useApp } from '@/context';
 
@@ -54,10 +56,19 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
     json: { label: 'JSON', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
     color_code: { label: 'COLOR', icon: <FileText className="h-3 w-3" />, variant: 'accent' as const },
     path: { label: 'PATH', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
+    image: { label: 'IMG', icon: <ImageIcon className="h-3 w-3" />, variant: 'accent' as const },
+    files: { label: 'FILES', icon: <Files className="h-3 w-3" />, variant: 'default' as const },
   };
 
   const config = typeConfig[entry.contentType];
-  const previewText = entry.content.replace(/\s+/g, ' ').trim();
+  const previewText =
+    entry.contentType === 'image'
+      ? `${entry.imageWidth ?? '?'} × ${entry.imageHeight ?? '?'} image`
+      : entry.contentType === 'files'
+      ? `${entry.fileCount ?? 0} file${(entry.fileCount ?? 0) === 1 ? '' : 's'}: ${entry.content
+          .replace(/\s+/g, ' ')
+          .trim()}`
+      : entry.content.replace(/\s+/g, ' ').trim();
 
   const contextMenuItems: ContextMenuItem[] = [
     {
@@ -118,9 +129,18 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
       >
         {/* Left: Type badge + text preview */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <Badge variant={config.variant} size="sm" className="font-mono text-[10px]">
-            {config.label}
-          </Badge>
+          {entry.contentType === 'image' && entry.thumbnailUrl ? (
+            <img
+              src={entry.thumbnailUrl}
+              alt="Clipboard image thumbnail"
+              className="h-8 w-11 shrink-0 rounded-[3px] border border-graphite-border object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <Badge variant={config.variant} size="sm" className="font-mono text-[10px]">
+              {config.label}
+            </Badge>
+          )}
 
           <div className="truncate min-w-0 flex-1">
             <HighlightText

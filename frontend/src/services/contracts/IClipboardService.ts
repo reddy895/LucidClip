@@ -4,6 +4,7 @@ export interface IClipboardService {
   getHistory(): Promise<ClipboardEntry[]>;
   getEntryById(id: string): Promise<ClipboardEntry | null>;
   copyToClipboard(content: string): Promise<boolean>;
+  copyEntryById(id: string): Promise<boolean>;
   togglePin(id: string): Promise<ClipboardEntry>;
   toggleFavorite(id: string): Promise<ClipboardEntry>;
   deleteEntry(id: string): Promise<boolean>;
