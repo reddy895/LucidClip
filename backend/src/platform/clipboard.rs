@@ -26,6 +26,7 @@ mod windows_clipboard {
     use std::time::Duration;
 
     use windows_sys::Win32::Foundation::{GetLastError, GlobalFree, HGLOBAL};
+    use windows_sys::Win32::Globalization::MultiByteToWideChar;
     use windows_sys::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
         OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
@@ -40,6 +41,9 @@ mod windows_clipboard {
 
     /// Standard clipboard format identifier for null-terminated UTF-16 text.
     const CF_UNICODETEXT: u32 = 13;
+
+    /// Legacy ANSI text format used by some older applications.
+    const CF_TEXT: u32 = 1;
 
     /// Device-independent bitmap format.
     const CF_DIB: u32 = 8;
@@ -330,6 +334,10 @@ mod windows_clipboard {
             return Ok(Some(ClipboardSnapshot::Text(text)));
         }
 
+        if let Some(text) = read_ansi_text()? {
+            return Ok(Some(ClipboardSnapshot::Text(text)));
+        }
+
         Ok(None)
     }
 
@@ -371,6 +379,58 @@ mod windows_clipboard {
         }
 
         Ok(Some(String::from_utf16_lossy(&utf16)))
+    }
+
+    fn read_ansi_text() -> Result<Option<String>> {
+        if unsafe { IsClipboardFormatAvailable(CF_TEXT) } == 0 {
+            return Ok(None);
+        }
+
+        let handle = unsafe { GetClipboardData(CF_TEXT) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+
+        let source = unsafe { GlobalLock(handle) } as *const u8;
+        if source.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to lock Windows clipboard text".into(),
+            ));
+        }
+
+        let byte_len = unsafe { GlobalSize(handle) } as usize;
+        let bytes = unsafe { std::slice::from_raw_parts(source, byte_len) };
+        let end = bytes.iter().position(|byte| *byte == 0).unwrap_or(byte_len);
+        let ansi = bytes[..end].to_vec();
+        unsafe {
+            GlobalUnlock(handle);
+        }
+
+        if ansi.is_empty() {
+            return Ok(None);
+        }
+
+        let ansi_len = i32::try_from(ansi.len())
+            .map_err(|_| AppError::Clipboard("Clipboard text is too large".into()))?;
+        let wide_len =
+            unsafe { MultiByteToWideChar(0, 0, ansi.as_ptr(), ansi_len, std::ptr::null_mut(), 0) };
+        if wide_len <= 0 {
+            return Err(AppError::Clipboard(
+                "Failed to measure legacy clipboard text".into(),
+            ));
+        }
+
+        let mut wide = vec![0u16; wide_len as usize];
+        let written = unsafe {
+            MultiByteToWideChar(0, 0, ansi.as_ptr(), ansi_len, wide.as_mut_ptr(), wide_len)
+        };
+        if written <= 0 {
+            return Err(AppError::Clipboard(
+                "Failed to decode legacy clipboard text".into(),
+            ));
+        }
+
+        Ok(Some(String::from_utf16_lossy(&wide)))
     }
 
     fn read_files() -> Result<Option<Vec<String>>> {

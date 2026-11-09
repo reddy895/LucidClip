@@ -19,7 +19,7 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 ### Clipboard history
 
 - Listens for native Windows clipboard updates, with a two-second safety pass and a polling fallback.
-- Captures Unicode text, `CF_DIB`/`CF_DIBV5` images, and Explorer `CF_HDROP` file lists.
+- Captures Unicode or legacy ANSI text, `CF_DIB`/`CF_DIBV5` images, and Explorer `CF_HDROP` file lists.
 - Classifies text as plain, multiline, URL, JSON, code, color, or file path; images and file lists use dedicated types.
 - Deduplicates by domain-separated SHA-256 hashes and refreshes the timestamp of repeated content.
 - Stores clipboard images as PNG originals plus 320x180-bounded thumbnails under the existing screenshot directories.
