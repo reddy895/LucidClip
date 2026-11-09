@@ -10,10 +10,11 @@ mod windows_clipboard {
 
     use windows_sys::Win32::Foundation::{GetLastError, GlobalFree, HGLOBAL};
     use windows_sys::Win32::System::DataExchange::{
-        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+        CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+        OpenClipboard, SetClipboardData,
     };
     use windows_sys::Win32::System::Memory::{
-        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+        GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
 
     use crate::errors::{AppError, Result};
@@ -93,6 +94,43 @@ mod windows_clipboard {
 
         Ok(())
     }
+
+    pub fn read_text() -> Result<Option<String>> {
+        let _session = ClipboardSession::open()?;
+
+        if unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT) } == 0 {
+            return Ok(None);
+        }
+
+        let handle = unsafe { GetClipboardData(CF_UNICODETEXT) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+
+        let source = unsafe { GlobalLock(handle) } as *const u16;
+        if source.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to lock Windows clipboard data".into(),
+            ));
+        }
+
+        let byte_len = unsafe { GlobalSize(handle) };
+        let unit_count = byte_len / std::mem::size_of::<u16>();
+        let mut utf16 = Vec::with_capacity(unit_count.min(1_048_576));
+
+        unsafe {
+            for index in 0..unit_count {
+                let unit = *source.add(index);
+                if unit == 0 {
+                    break;
+                }
+                utf16.push(unit);
+            }
+            GlobalUnlock(handle);
+        }
+
+        Ok(Some(String::from_utf16_lossy(&utf16)))
+    }
 }
 
 /// Write plain text to the operating system clipboard.
@@ -111,4 +149,26 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
         );
         Ok(())
     }
+}
+
+/// Read text from the operating system clipboard when the platform supports it.
+///
+/// `Ok(None)` means the clipboard contains no supported text format. On hosts
+/// without native clipboard integration this always returns `Ok(None)` so
+/// development builds never fabricate clipboard content.
+pub fn read_clipboard_text() -> Result<Option<String>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_clipboard::read_text()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
+}
+
+/// Whether background clipboard monitoring is available on this host.
+pub const fn clipboard_monitoring_supported() -> bool {
+    cfg!(target_os = "windows")
 }
