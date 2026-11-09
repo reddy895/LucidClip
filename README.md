@@ -8,7 +8,7 @@ LucidClip aims to make previously copied text and captured screenshots instantly
 
 Instead of losing important information when copying something new, LucidClip is designed to preserve your clipboard history and screenshots locally, giving you a centralized place to find them whenever you need them.
 
-> **Project Status:** Active Architecture & Local-First Desktop Implementation  
+> **Project Status:** Active Local-First Desktop Implementation — clipboard history persistence, classification, deduplication, and search are wired to SQLite; native capture and monitoring are in progress.  
 > **Platform:** Windows 10 / Windows 11 (Cross-platform dev support)  
 > **Backend:** Rust, Tauri 2, SQLite  
 > **Frontend:** React 18, TypeScript, Vite, Tailwind CSS  
@@ -293,8 +293,10 @@ flowchart TD
     P4 --> P5
 
     classDef current fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class P1 current
+    class P2 current
 ```
+
+**Current phase:** Phase 2 is in progress. Clipboard persistence, classification, deduplication, and history management are implemented; the background clipboard listener is the next milestone.
 
 ### Phase 1 — Documentation & Product Foundation
 
@@ -393,11 +395,31 @@ The repository structure will expand as application development progresses.
 
 ## Getting Started
 
-LucidClip is currently in its documentation and product-planning phase.
+LucidClip is under active development and does not yet ship a public installer. The desktop application runs on Windows 10/11 with the WebView2 runtime; the frontend can also be developed in a regular browser against the local mock adapters.
 
-Application installation and development instructions will be added when the initial implementation is available.
+### Prerequisites
 
-There is currently no public release installer.
+- Node.js 20+ and npm
+- Rust toolchain with the Tauri 2 prerequisites for your platform
+- Windows: MSVC build tools and WebView2 (preinstalled on Windows 11)
+
+### Run the desktop application
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` coordinates the Vite frontend and the Tauri backend. To work on the UI alone, use `npm run dev:frontend`.
+
+### Verify the project
+
+```bash
+npm test          # integrity suite (frontend contracts + Rust unit tests)
+npm run typecheck # TypeScript, no emit
+npm run build     # production frontend build
+cd backend && cargo test
+```
 
 ---
 
@@ -411,8 +433,11 @@ The LucidClip desktop frontend is built using React 18, TypeScript, Vite, and Ta
 # Install dependencies
 npm install
 
-# Start Vite development server
+# Start the full desktop dev environment (Vite + Tauri)
 npm run dev
+
+# Run only the Vite frontend in a browser
+npm run dev:frontend
 
 # Run TypeScript typecheck
 npm run typecheck

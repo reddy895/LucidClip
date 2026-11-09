@@ -80,3 +80,56 @@ All sample and demo entries are isolated solely to test fixtures and are never i
 - `npm run typecheck`: Runs TypeScript compiler without emit (`tsc --noEmit`)
 - `npm run build`: Runs production frontend build (`vite build`)
 - `cd backend && cargo test`: Runs Rust unit tests for database migrations, classification, hashing, and deduplication
+
+## 6. Tauri IPC Command Surface
+
+The registered handlers in `backend/src/commands/mod.rs` are:
+
+| Command | Purpose |
+|---|---|
+| `get_clipboard_entries` | List persisted clipboard entries (newest first) |
+| `add_clipboard_entry` | Classify, hash, deduplicate, and persist copied text |
+| `copy_clipboard_entry` | Restore text to the operating system clipboard |
+| `delete_clipboard_entry` | Delete a single clipboard entry |
+| `toggle_clipboard_pin` / `toggle_clipboard_favorite` | Toggle entry flags |
+| `clear_clipboard_history` | Delete all unpinned clipboard entries |
+| `get_screenshots` | List persisted screenshot records |
+| `delete_screenshot` | Remove the record and its original/thumbnail files |
+| `toggle_screenshot_pin` / `toggle_screenshot_favorite` | Toggle screenshot flags |
+| `get_settings` / `update_setting` | Read and upsert JSON application settings |
+| `get_storage_stats` | Report database and screenshot storage usage |
+
+## 7. Screenshot Asset Delivery
+
+Screenshot files live outside the webview origin, so absolute filesystem paths cannot be loaded directly by an `<img>` element. The desktop build:
+
+- Enables the Tauri `protocol-asset` crate feature in `backend/Cargo.toml`.
+- Enables `app.security.assetProtocol` in `backend/tauri.conf.json` with a scope limited to the LucidClip screenshot directories for both Windows (`%LOCALAPPDATA%/LucidClip`) and the Linux development data directory.
+- Converts `original_path` and `thumbnail_path` with `convertFileSrc` inside `frontend/src/services/tauri/TauriScreenshotService.ts`.
+
+No screenshot directory outside the application data root is exposed to the webview.
+
+## 8. Clipboard Restoration
+
+`copy_clipboard_entry` delegates to `backend/src/platform/clipboard.rs`. On Windows the platform module calls `OpenClipboard`, `EmptyClipboard`, and `SetClipboardData` with a null-terminated UTF-16 buffer. Clipboard contention is retried briefly, memory allocation and locking failures are reported as structured errors, and a RAII guard closes the clipboard on every exit path. Non-Windows hosts are development-only and log the write without touching the host clipboard.
+
+## 9. Unified Search Data Flow
+
+The All Items workspace uses `HistorySearchService`, which is constructed with the active clipboard and screenshot adapters. In the desktop build those adapters are the Tauri IPC services, so search always reads from the local SQLite store. The browser development build injects the mock adapters instead. Filtering and sorting live in the pure `filterHistory` utility so both paths behave identically.
+
+## 10. Implementation Status
+
+Implemented:
+- React/Tauri 2 application shell with the graphite desktop workspace.
+- SQLite database, migrations, repositories, and WAL configuration.
+- Clipboard text classification, SHA-256 normalization, and deduplication.
+- Clipboard and screenshot history, pin/favorite/delete, settings, and storage statistics commands.
+- Native Windows clipboard restoration and scoped screenshot asset delivery.
+
+Not yet implemented:
+- Background clipboard change listener / polling loop.
+- Screenshot capture, thumbnail generation, and OCR pipeline.
+- Retention and max-history enforcement against captured data.
+- System tray, launch-at-startup, and global hotkey registration.
+
+Documentation should keep the implemented IPC surface separate from these planned capabilities.
