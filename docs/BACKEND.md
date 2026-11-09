@@ -145,6 +145,7 @@ Screenshot deletion removes the SQLite row before unlinking files. A failed unli
 - Exclusions compare the foreground executable name case-insensitively.
 - Launch at login writes or removes the current executable under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LucidClip`.
 - Settings updates synchronize the registry entry before persisting, so a registry failure is reported instead of claiming success.
+- A tray icon owns the background lifecycle. Closing the window hides it; Show restores it, and Quit exits the process. If tray creation fails, the close handler is not installed so the window cannot become unreachable.
 
 ## 13. Implementation Status
 
@@ -156,10 +157,10 @@ Implemented:
 - Native Windows clipboard text and image writing, scoped screenshot asset delivery.
 - Full-desktop and region screenshot capture, thumbnails, crop, copy, and export.
 - Launch at Windows login.
+- System tray background operation with explicit Show and Quit actions.
 
 Not implemented:
 - Screenshot OCR or text extraction.
-- System tray icon and close-to-tray behavior.
 - Global hotkey registration outside the focused window.
 - Configurable screenshot save directory.
 - Signed installer and public release packaging.

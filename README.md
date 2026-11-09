@@ -4,7 +4,7 @@
 
 LucidClip keeps copied text and captured screenshots searchable on the local machine. It does not require an account, does not upload data, and does not include telemetry.
 
-> **Project status:** Active Windows desktop implementation. Clipboard monitoring, SQLite persistence, screenshot capture and region selection, image copy/export, retention, source-app exclusions, and launch-at-login are implemented. OCR, system tray behavior, and global hotkeys remain planned and are not exposed as working controls.
+> **Project status:** Active Windows desktop implementation. Clipboard monitoring, SQLite persistence, screenshot capture and region selection, image copy/export, retention, source-app exclusions, launch-at-login, and background system-tray operation are implemented. OCR and global hotkeys remain planned and are not exposed as working controls.
 >
 > **Platform:** Windows 10 / Windows 11 (64-bit target)
 >
@@ -43,10 +43,15 @@ LucidClip keeps copied text and captured screenshots searchable on the local mac
 - Shows real SQLite and screenshot storage sizes plus entry counts.
 - Reports backend failures instead of silently replacing data with empty results.
 
+### Background operation
+
+- A system tray icon exposes Show LucidClip and Quit LucidClip.
+- Closing the main window hides it instead of ending clipboard monitoring.
+- Quit is the explicit way to stop the backend and monitor thread.
+
 ### Not implemented
 
 - Screenshot text extraction (OCR).
-- System tray icon and close-to-tray behavior.
 - Global hotkeys outside the focused LucidClip window.
 - Configurable screenshot save directory.
 - Windows installer signing and release packaging.
@@ -121,6 +126,7 @@ flowchart LR
 ```
 
 - The clipboard monitor polls every 500 ms and applies pause, exclusion, and retention settings.
+- Closing the main window hides it to the tray; the monitor keeps running until Quit is selected.
 - Capture and persistence run in the Rust backend; the frontend only requests operations and renders real stored data.
 - The browser development build uses local adapters and refuses operations that require Window-native capture.
 
@@ -158,7 +164,8 @@ LucidClip/
 
 - Native clipboard, capture, and startup behavior can only be fully verified on Windows.
 - Cross-compiling the full backend on Linux is blocked by the bundled SQLite build needing a MinGW C compiler; Windows-only modules are checked separately with the GNU target.
-- OCR, tray, and global shortcut behavior remain roadmap items rather than shipped features.
+- OCR and global shortcut behavior remain roadmap items rather than shipped features.
+- The tray icon uses the bundled application icon; native tray behavior is verified on Windows during release testing.
 
 ## License
 

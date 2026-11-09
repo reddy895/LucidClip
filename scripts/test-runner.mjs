@@ -94,6 +94,26 @@ describe('LucidClip Core Integrity Verification', () => {
     assert.ok(html.includes('id="root"'), 'Built HTML must contain root container');
   });
 
+  test('Tray lifecycle keeps the backend alive when the main window closes', () => {
+    const cargoSource = fs.readFileSync(path.join(backendDir, 'Cargo.toml'), 'utf8');
+    assert.ok(
+      cargoSource.includes('"tray-icon"'),
+      'Tauri must enable the tray-icon feature'
+    );
+
+    const libSource = fs.readFileSync(path.join(backendDir, 'src/lib.rs'), 'utf8');
+    for (const marker of [
+      'TrayIconBuilder',
+      'WindowEvent::CloseRequested',
+      'api.prevent_close()',
+      'window_for_event.hide()',
+      '"show" => show_main_window(app)',
+      '"quit" => app.exit(0)',
+    ]) {
+      assert.ok(libSource.includes(marker), `Tray lifecycle must include ${marker}`);
+    }
+  });
+
   test('Tauri 2 IPC Capabilities: default capability file exists and restricts permissions', () => {
     const capPath = path.join(backendDir, 'capabilities/default.json');
     assert.ok(fs.existsSync(capPath), 'Tauri 2 capabilities/default.json must exist');

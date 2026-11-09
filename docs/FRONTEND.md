@@ -143,7 +143,7 @@ npm run build
 ## 6. Current Limitations
 
 - Screenshot OCR is not implemented, so the UI does not show OCR badges, text panels, or OCR settings.
-- The system tray and close-to-tray behavior are not implemented.
+- Closing the window keeps the backend alive in the system tray; Quit from the tray menu stops it.
 - Global hotkeys are not registered; in-window shortcuts are the supported path.
 - The screenshot save directory is fixed to the application data folder.
 - Native clipboard, screenshot, and startup paths require Windows and cannot be fully validated in a Linux frontend build.

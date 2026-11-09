@@ -15,9 +15,10 @@
 - GDI desktop capture, region crop, PNG originals, and thumbnails.
 - SQLite migrations and persistence for clipboard, screenshots, settings, and storage stats.
 - Launch-at-login through the per-user Windows registry.
+- System-tray background operation with Show and Quit actions.
 
 ## 3. Deliberate Gaps
 
-- OCR, system tray, global hotkeys, configurable screenshot paths, and signed installer packaging are not implemented.
+- OCR, global hotkeys, configurable screenshot paths, and signed installer packaging are not implemented.
 - Native behavior and installer output must be verified on a Windows machine.
 - Browser development adapters return explicit unsupported errors for native operations instead of fabricating screenshots or OCR.
