@@ -1,6 +1,21 @@
 //! Operating system clipboard integrations.
 
-use crate::errors::Result;
+use crate::errors::{AppError, Result};
+use crate::platform::CapturedImage;
+
+/// A supported clipboard value captured in one clipboard session.
+#[derive(Debug, Clone)]
+pub enum ClipboardSnapshot {
+    Text(String),
+    Image(CapturedImage),
+    Files(Vec<String>),
+}
+
+/// Maximum decoded image bytes accepted from another process.
+const MAX_IMAGE_BYTES: usize = 128 * 1024 * 1024;
+
+/// Maximum number of file references accepted from one clipboard value.
+const MAX_FILE_COUNT: usize = 10_000;
 
 #[cfg(target_os = "windows")]
 mod windows_clipboard {
@@ -17,13 +32,21 @@ mod windows_clipboard {
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
 
+    use super::{parse_dib, parse_file_list, ClipboardSnapshot};
     use crate::errors::{AppError, Result};
+    use crate::platform::CapturedImage;
 
     /// Standard clipboard format identifier for null-terminated UTF-16 text.
     const CF_UNICODETEXT: u32 = 13;
 
     /// Device-independent bitmap format.
     const CF_DIB: u32 = 8;
+
+    /// Device-independent bitmap with an extended header.
+    const CF_DIBV5: u32 = 17;
+
+    /// Shell file list.
+    const CF_HDROP: u32 = 15;
 
     /// RAII guard that guarantees the clipboard is closed on every exit path.
     struct ClipboardSession;
@@ -232,9 +255,36 @@ mod windows_clipboard {
         unsafe { RegisterClipboardFormatW(wide.as_ptr()) }
     }
 
-    pub fn read_text() -> Result<Option<String>> {
+    pub fn read_snapshot() -> Result<Option<ClipboardSnapshot>> {
         let _session = ClipboardSession::open()?;
 
+        if unsafe { IsClipboardFormatAvailable(CF_HDROP) } != 0 {
+            if let Some(files) = read_files()? {
+                return Ok(Some(ClipboardSnapshot::Files(files)));
+            }
+        }
+
+        for format in [CF_DIB, CF_DIBV5] {
+            if unsafe { IsClipboardFormatAvailable(format) } != 0 {
+                if let Some(image) = read_image(format)? {
+                    return Ok(Some(ClipboardSnapshot::Image(image)));
+                }
+            }
+        }
+
+        if let Some(text) = read_unicode_text()? {
+            return Ok(Some(ClipboardSnapshot::Text(text)));
+        }
+
+        Ok(None)
+    }
+
+    pub fn read_text() -> Result<Option<String>> {
+        let _session = ClipboardSession::open()?;
+        read_unicode_text()
+    }
+
+    fn read_unicode_text() -> Result<Option<String>> {
         if unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT) } == 0 {
             return Ok(None);
         }
@@ -268,6 +318,184 @@ mod windows_clipboard {
 
         Ok(Some(String::from_utf16_lossy(&utf16)))
     }
+
+    fn read_files() -> Result<Option<Vec<String>>> {
+        let handle = unsafe { GetClipboardData(CF_HDROP) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+
+        let source = unsafe { GlobalLock(handle) } as *const u8;
+        if source.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to lock the Windows file list".into(),
+            ));
+        }
+
+        let byte_len = unsafe { GlobalSize(handle) } as usize;
+        let data = unsafe { std::slice::from_raw_parts(source, byte_len) };
+        let result = parse_file_list(data);
+        unsafe {
+            GlobalUnlock(handle);
+        }
+
+        match result {
+            Ok(files) if files.is_empty() => Ok(None),
+            Ok(files) => Ok(Some(files)),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn read_image(format: u32) -> Result<Option<CapturedImage>> {
+        let handle = unsafe { GetClipboardData(format) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+
+        let source = unsafe { GlobalLock(handle) } as *const u8;
+        if source.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to lock the Windows clipboard image".into(),
+            ));
+        }
+
+        let byte_len = unsafe { GlobalSize(handle) } as usize;
+        let data = unsafe { std::slice::from_raw_parts(source, byte_len) };
+        let result = parse_dib(data);
+        unsafe {
+            GlobalUnlock(handle);
+        }
+        result.map(Some)
+    }
+}
+
+fn parse_file_list(data: &[u8]) -> Result<Vec<String>> {
+    if data.len() < 20 {
+        return Err(AppError::Clipboard(
+            "Windows returned a truncated file list".into(),
+        ));
+    }
+
+    let offset = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+    let wide = u32::from_le_bytes(data[16..20].try_into().unwrap()) != 0;
+    if offset >= data.len() {
+        return Err(AppError::Clipboard(
+            "Windows returned an invalid file list offset".into(),
+        ));
+    }
+    if !wide {
+        return Err(AppError::Clipboard(
+            "ANSI file lists are not supported".into(),
+        ));
+    }
+
+    let mut files = Vec::new();
+    let mut cursor = offset;
+    while cursor + 2 <= data.len() && files.len() < MAX_FILE_COUNT {
+        let mut units = Vec::new();
+        loop {
+            if cursor + 2 > data.len() {
+                break;
+            }
+            let unit = u16::from_le_bytes([data[cursor], data[cursor + 1]]);
+            cursor += 2;
+            if unit == 0 {
+                break;
+            }
+            units.push(unit);
+        }
+
+        if units.is_empty() {
+            break;
+        }
+        files.push(String::from_utf16_lossy(&units));
+    }
+
+    Ok(files)
+}
+
+fn parse_dib(data: &[u8]) -> Result<CapturedImage> {
+    if data.len() < 40 {
+        return Err(AppError::Clipboard(
+            "Windows returned a truncated bitmap".into(),
+        ));
+    }
+
+    let header_size = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+    if header_size < 40 || header_size > data.len() {
+        return Err(AppError::Clipboard(
+            "Windows returned an unsupported bitmap header".into(),
+        ));
+    }
+
+    let width = i32::from_le_bytes(data[4..8].try_into().unwrap());
+    let signed_height = i32::from_le_bytes(data[8..12].try_into().unwrap());
+    let planes = u16::from_le_bytes(data[12..14].try_into().unwrap());
+    let bit_count = u16::from_le_bytes(data[14..16].try_into().unwrap());
+    let compression = u32::from_le_bytes(data[16..20].try_into().unwrap());
+
+    if width <= 0 || signed_height == 0 || planes != 1 {
+        return Err(AppError::Clipboard(
+            "Windows returned invalid bitmap dimensions".into(),
+        ));
+    }
+    if compression != 0 || !matches!(bit_count, 24 | 32) {
+        return Err(AppError::Clipboard(format!(
+            "Unsupported clipboard bitmap (compression {compression}, {bit_count} bpp)"
+        )));
+    }
+
+    let width = width as u32;
+    let height = signed_height.unsigned_abs();
+    let top_down = signed_height < 0;
+    if width > 32_768 || height > 32_768 {
+        return Err(AppError::Clipboard(
+            "Clipboard bitmap dimensions are too large".into(),
+        ));
+    }
+
+    let row_stride = ((width as usize * bit_count as usize + 31) / 32) * 4;
+    let pixel_bytes = row_stride
+        .checked_mul(height as usize)
+        .ok_or_else(|| AppError::Clipboard("Clipboard bitmap size overflowed".into()))?;
+    let total_bytes = header_size
+        .checked_add(pixel_bytes)
+        .ok_or_else(|| AppError::Clipboard("Clipboard bitmap size overflowed".into()))?;
+
+    if total_bytes > data.len() || pixel_bytes > MAX_IMAGE_BYTES {
+        return Err(AppError::Clipboard(
+            "Clipboard bitmap is larger than the supported limit".into(),
+        ));
+    }
+
+    let rgba_len = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| AppError::Clipboard("Clipboard bitmap size overflowed".into()))?;
+    let mut rgba = vec![0u8; rgba_len];
+    let bytes_per_pixel = (bit_count / 8) as usize;
+
+    for row in 0..height as usize {
+        let source_row = if top_down {
+            row
+        } else {
+            height as usize - 1 - row
+        };
+        for column in 0..width as usize {
+            let source_index = header_size + source_row * row_stride + column * bytes_per_pixel;
+            let target_index = (row * width as usize + column) * 4;
+            rgba[target_index] = data[source_index + 2];
+            rgba[target_index + 1] = data[source_index + 1];
+            rgba[target_index + 2] = data[source_index];
+            rgba[target_index + 3] = 255;
+        }
+    }
+
+    Ok(CapturedImage {
+        width,
+        height,
+        rgba,
+    })
 }
 
 /// Write plain text to the operating system clipboard.
@@ -280,7 +508,7 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = text;
-        Err(crate::errors::AppError::Clipboard(
+        Err(AppError::Clipboard(
             "Clipboard writing is only available on Windows".into(),
         ))
     }
@@ -296,9 +524,22 @@ pub fn set_clipboard_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (rgba, width, height);
-        Err(crate::errors::AppError::Clipboard(
+        Err(AppError::Clipboard(
             "Copying images is only available on Windows".into(),
         ))
+    }
+}
+
+/// Read the highest-priority supported value from the clipboard in one session.
+pub fn read_clipboard_snapshot() -> Result<Option<ClipboardSnapshot>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_clipboard::read_snapshot()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
     }
 }
 
@@ -336,4 +577,66 @@ pub fn clipboard_content_is_sensitive() -> Result<bool> {
 /// Whether background clipboard monitoring is available on this host.
 pub const fn clipboard_monitoring_supported() -> bool {
     cfg!(target_os = "windows")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dib_2x2_top_down() -> Vec<u8> {
+        let mut data = vec![0u8; 40];
+        data[0..4].copy_from_slice(&40u32.to_le_bytes());
+        data[4..8].copy_from_slice(&2i32.to_le_bytes());
+        data[8..12].copy_from_slice(&(-2i32).to_le_bytes());
+        data[12..14].copy_from_slice(&1u16.to_le_bytes());
+        data[14..16].copy_from_slice(&24u16.to_le_bytes());
+        data.extend_from_slice(&[
+            0, 0, 255, 0, 255, 0, 0, 0, // red, green + padding
+            255, 0, 0, 255, 255, 255, 0, 0, // blue, white + padding
+        ]);
+        data
+    }
+
+    #[test]
+    fn parses_top_down_24_bit_bitmap() {
+        let image = parse_dib(&dib_2x2_top_down()).unwrap();
+        assert_eq!((image.width, image.height), (2, 2));
+        assert_eq!(&image.rgba[0..4], &[255, 0, 0, 255]);
+        assert_eq!(&image.rgba[4..8], &[0, 255, 0, 255]);
+        assert_eq!(&image.rgba[8..12], &[0, 0, 255, 255]);
+        assert_eq!(&image.rgba[12..16], &[255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn rejects_compressed_or_truncated_bitmaps() {
+        let mut compressed = dib_2x2_top_down();
+        compressed[16..20].copy_from_slice(&3u32.to_le_bytes());
+        assert!(parse_dib(&compressed).is_err());
+        assert!(parse_dib(&dib_2x2_top_down()[..44]).is_err());
+    }
+
+    #[test]
+    fn parses_wide_dropfile_list() {
+        let paths = "C:\\Work\\a.txt\0D:\\b.txt\0\0";
+        let wide: Vec<u8> = paths
+            .encode_utf16()
+            .flat_map(|unit| unit.to_le_bytes())
+            .collect();
+        let mut data = vec![0u8; 20];
+        data[0..4].copy_from_slice(&20u32.to_le_bytes());
+        data[16..20].copy_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&wide);
+
+        assert_eq!(
+            parse_file_list(&data).unwrap(),
+            vec!["C:\\Work\\a.txt".to_string(), "D:\\b.txt".to_string()]
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_file_list_offsets() {
+        let mut data = vec![0u8; 20];
+        data[0..4].copy_from_slice(&20u32.to_le_bytes());
+        assert!(parse_file_list(&data).is_err());
+    }
 }

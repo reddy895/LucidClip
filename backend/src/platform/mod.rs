@@ -8,8 +8,8 @@ pub mod startup;
 pub mod window;
 
 pub use clipboard::{
-    clipboard_content_is_sensitive, clipboard_monitoring_supported, read_clipboard_text,
-    set_clipboard_image, set_clipboard_text,
+    clipboard_content_is_sensitive, clipboard_monitoring_supported, read_clipboard_snapshot,
+    read_clipboard_text, set_clipboard_image, set_clipboard_text, ClipboardSnapshot,
 };
 #[cfg(target_os = "windows")]
 pub use clipboard_watcher::spawn as spawn_clipboard_watcher;

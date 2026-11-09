@@ -15,7 +15,7 @@ use tauri::{AppHandle, Emitter};
 use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
 use crate::database::{DbPool, SettingsRepo};
-use crate::platform;
+use crate::platform::{self, ClipboardSnapshot};
 use crate::storage::AppPaths;
 
 /// Event emitted whenever the monitor persists a new clipboard entry.
@@ -128,7 +128,7 @@ struct CaptureState {
     last_hash: Option<String>,
 }
 
-fn capture_text_once(
+fn capture_clipboard_once(
     app: &AppHandle,
     pool: &DbPool,
     paths: &AppPaths,
@@ -160,8 +160,8 @@ fn capture_text_once(
         }
     }
 
-    match platform::read_clipboard_text() {
-        Ok(Some(text)) if !text.trim().is_empty() => {
+    match platform::read_clipboard_snapshot() {
+        Ok(Some(ClipboardSnapshot::Text(text))) if !text.trim().is_empty() => {
             if text.chars().count() > MAX_CAPTURE_CHARS {
                 eprintln!(
                     "[LucidClip Monitor] Skipped clipboard content larger than {MAX_CAPTURE_CHARS} characters."
@@ -176,26 +176,57 @@ fn capture_text_once(
 
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_text(&text, foreground) {
-                Ok(entry) => {
-                    state.last_hash = Some(hash);
-                    if let Err(err) = app.emit(CLIPBOARD_CAPTURED_EVENT, &entry) {
-                        eprintln!("[LucidClip Monitor] Failed to notify frontend: {err}");
-                    }
-                }
+                Ok(entry) => record_capture(app, state, entry),
                 Err(err) => {
-                    eprintln!("[LucidClip Monitor] Failed to persist clipboard entry: {err}");
+                    eprintln!("[LucidClip Monitor] Failed to persist clipboard text: {err}");
+                }
+            }
+        }
+        Ok(Some(ClipboardSnapshot::Image(image))) => {
+            let service = ClipboardService::with_paths(pool, paths);
+            match service.process_copied_image(image, foreground) {
+                Ok(entry) => record_capture(app, state, entry),
+                Err(err) => {
+                    eprintln!("[LucidClip Monitor] Failed to persist clipboard image: {err}");
+                }
+            }
+        }
+        Ok(Some(ClipboardSnapshot::Files(files))) => {
+            if files.iter().map(String::len).sum::<usize>() > MAX_CAPTURE_CHARS {
+                eprintln!(
+                    "[LucidClip Monitor] Skipped file list larger than {MAX_CAPTURE_CHARS} characters."
+                );
+                return;
+            }
+
+            let service = ClipboardService::with_paths(pool, paths);
+            match service.process_copied_files(files, foreground) {
+                Ok(entry) => record_capture(app, state, entry),
+                Err(err) => {
+                    eprintln!("[LucidClip Monitor] Failed to persist clipboard files: {err}");
                 }
             }
         }
         Ok(_) => {
-            // The clipboard no longer holds text. Clear the fingerprint so the
-            // same text is captured again after an image or file copy.
+            // The clipboard no longer holds a supported value. Clear the
+            // fingerprint so the same content is captured again later.
             state.last_hash = None;
         }
         Err(err) => {
             // Clipboard contention is expected; retry on the next tick.
             eprintln!("[LucidClip Monitor] Clipboard read skipped: {err}");
         }
+    }
+}
+
+fn record_capture(
+    app: &AppHandle,
+    state: &mut CaptureState,
+    entry: crate::database::DbClipboardEntry,
+) {
+    state.last_hash = Some(entry.content_hash.clone());
+    if let Err(err) = app.emit(CLIPBOARD_CAPTURED_EVENT, &entry) {
+        eprintln!("[LucidClip Monitor] Failed to notify frontend: {err}");
     }
 }
 
@@ -223,7 +254,7 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
     // Capture the current clipboard once at startup.
     let policy = monitor_policy(&pool);
     if policy.enabled {
-        capture_text_once(&app, &pool, &paths, &policy, &mut state);
+        capture_clipboard_once(&app, &pool, &paths, &policy, &mut state);
     }
 
     while !stop.load(Ordering::Relaxed) {
@@ -251,7 +282,7 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
 
         let policy = monitor_policy(&pool);
         if policy.enabled {
-            capture_text_once(&app, &pool, &paths, &policy, &mut state);
+            capture_clipboard_once(&app, &pool, &paths, &policy, &mut state);
         }
     }
 

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use crate::clipboard::classifier::classify_content;
-use crate::clipboard::hasher::hash_content;
+use crate::clipboard::hasher::{hash_bytes, hash_content};
 use crate::clipboard::media;
 use crate::database::{ClipboardRepo, DbClipboardEntry, DbPool, SettingsRepo};
 use crate::errors::{AppError, Result};
@@ -137,6 +137,67 @@ impl<'a> ClipboardService<'a> {
         Ok(new_entry)
     }
 
+    /// Process file references copied from the operating system clipboard.
+    pub fn process_copied_files(
+        &self,
+        files: Vec<String>,
+        source_app: Option<String>,
+    ) -> Result<DbClipboardEntry> {
+        let mut unique = Vec::new();
+        let mut seen = HashSet::new();
+        for file in files {
+            let file = file.trim().to_string();
+            if file.is_empty() || file.contains('\0') || !seen.insert(file.clone()) {
+                continue;
+            }
+            unique.push(file);
+        }
+        if unique.is_empty() {
+            return Err(AppError::InvalidInput(
+                "Clipboard file list did not contain any paths".into(),
+            ));
+        }
+
+        let content = unique.join("\n");
+        let content_hash = hash_bytes(b"lucidclip-files\0", content.as_bytes());
+        let now = Utc::now().timestamp_millis();
+
+        if let Some(mut existing) = self.repo.find_by_hash(&content_hash)? {
+            self.repo.update_timestamp(&existing.id, now)?;
+            existing.created_at = now;
+            return Ok(existing);
+        }
+
+        let entry_id = format!("clip_{}_{}", now, &content_hash[..8]);
+        let file_count = unique.len();
+        let content_type = if file_count == 1 { "path" } else { "files" };
+
+        let new_entry = DbClipboardEntry {
+            id: entry_id,
+            content,
+            content_type: content_type.into(),
+            source_app,
+            created_at: now,
+            content_hash,
+            pinned: false,
+            favorite: false,
+            image_path: None,
+            thumbnail_path: None,
+            image_width: None,
+            image_height: None,
+            byte_size: unique.iter().map(|file| file.len() as u64).sum(),
+            file_count: file_count as u32,
+        };
+
+        self.repo.insert(&new_entry)?;
+
+        if let Err(err) = self.enforce_retention() {
+            eprintln!("[LucidClip Clipboard] Retention cleanup failed: {err}");
+        }
+
+        Ok(new_entry)
+    }
+
     /// Apply the configured maximum item count and age policy to unpinned,
     /// non-favorite history.
     pub fn enforce_retention(&self) -> Result<usize> {
@@ -240,6 +301,38 @@ impl<'a> ClipboardService<'a> {
 mod tests {
     use super::*;
     use crate::database::run_migrations;
+
+    #[test]
+    fn copied_files_are_normalized_and_deduplicated() {
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ClipboardService::new(&pool);
+
+        let entry = service
+            .process_copied_files(
+                vec![
+                    r"C:\Work\alpha.txt".into(),
+                    r"C:\Work\alpha.txt".into(),
+                    "  ".into(),
+                    r"C:\Work\beta.txt".into(),
+                ],
+                Some("explorer.exe".into()),
+            )
+            .unwrap();
+
+        assert_eq!(entry.content_type, "files");
+        assert_eq!(entry.file_count, 2);
+        assert_eq!(entry.content, "C:\\Work\\alpha.txt\nC:\\Work\\beta.txt");
+
+        let again = service
+            .process_copied_files(
+                vec![r"C:\Work\alpha.txt".into(), r"C:\Work\beta.txt".into()],
+                None,
+            )
+            .unwrap();
+        assert_eq!(again.id, entry.id);
+        assert_eq!(service.get_history().unwrap().len(), 1);
+    }
 
     #[test]
     fn retention_limits_unpinned_history_and_preserves_marks() {
