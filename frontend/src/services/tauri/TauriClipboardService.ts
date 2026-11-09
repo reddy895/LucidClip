@@ -92,11 +92,7 @@ export class TauriClipboardService implements IClipboardService {
   }
 
   async clearHistory(): Promise<void> {
-    try {
-      await invoke<number>('clear_clipboard_history');
-    } catch (err) {
-      console.error('[LucidClip] Failed to clear history via backend:', err);
-    }
+    await invoke<number>('clear_clipboard_history');
   }
 
   async addEntry(content: string, sourceApp?: string): Promise<ClipboardEntry> {

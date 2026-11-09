@@ -118,95 +118,133 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const openQuickAccess = () => setIsQuickAccessOpen(true);
   const closeQuickAccess = () => setIsQuickAccessOpen(false);
 
+  const reportActionError = (action: string, err: unknown) => {
+    console.error(`[LucidClip] ${action} failed`, err);
+    toast.error(`${action} failed. Please try again.`);
+  };
+
   const copyItem = async (item: HistoryItem): Promise<boolean> => {
-    if (item.kind === 'clipboard') {
-      const success = await clipboardService.copyToClipboard(item.content);
-      if (success) {
-        toast.success('Copied to clipboard.');
-      } else {
-        toast.error('Failed to copy to clipboard.');
+    try {
+      if (item.kind === 'clipboard') {
+        const success = await clipboardService.copyToClipboard(item.content);
+        if (success) {
+          toast.success('Copied to clipboard.');
+        } else {
+          toast.error('Failed to copy to clipboard.');
+        }
+        return success;
       }
-      return success;
-    } else {
+
       const success = await screenshotService.copyImageToClipboard(item.id);
       if (success) {
         toast.success('Screenshot copied to clipboard.');
+      } else {
+        toast.error('Failed to copy screenshot to clipboard.');
       }
       return success;
+    } catch (err) {
+      reportActionError('Copy', err);
+      return false;
     }
   };
 
   const togglePin = async (item: HistoryItem) => {
-    if (item.kind === 'clipboard') {
-      const updated = await clipboardService.togglePin(item.id);
-      setClipboardItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      if (selectedItem?.id === updated.id) {
-        setSelectedItem({ kind: 'clipboard', ...updated });
+    try {
+      if (item.kind === 'clipboard') {
+        const updated = await clipboardService.togglePin(item.id);
+        setClipboardItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        if (selectedItem?.id === updated.id) {
+          setSelectedItem({ kind: 'clipboard', ...updated });
+        }
+        toast.info(updated.isPinned ? 'Item pinned.' : 'Item unpinned.');
+      } else {
+        const updated = await screenshotService.togglePin(item.id);
+        setScreenshotItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        if (selectedItem?.id === updated.id) {
+          setSelectedItem({ kind: 'screenshot', ...updated });
+        }
+        toast.info(updated.isPinned ? 'Screenshot pinned.' : 'Screenshot unpinned.');
       }
-      toast.info(updated.isPinned ? 'Item pinned.' : 'Item unpinned.');
-    } else {
-      const updated = await screenshotService.togglePin(item.id);
-      setScreenshotItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      if (selectedItem?.id === updated.id) {
-        setSelectedItem({ kind: 'screenshot', ...updated });
-      }
-      toast.info(updated.isPinned ? 'Screenshot pinned.' : 'Screenshot unpinned.');
+    } catch (err) {
+      reportActionError('Pin update', err);
     }
   };
 
   const toggleFavorite = async (item: HistoryItem) => {
-    if (item.kind === 'clipboard') {
-      const updated = await clipboardService.toggleFavorite(item.id);
-      setClipboardItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      if (selectedItem?.id === updated.id) {
-        setSelectedItem({ kind: 'clipboard', ...updated });
+    try {
+      if (item.kind === 'clipboard') {
+        const updated = await clipboardService.toggleFavorite(item.id);
+        setClipboardItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        if (selectedItem?.id === updated.id) {
+          setSelectedItem({ kind: 'clipboard', ...updated });
+        }
+        toast.info(updated.isFavorite ? 'Added to favorites.' : 'Removed from favorites.');
+      } else {
+        const updated = await screenshotService.toggleFavorite(item.id);
+        setScreenshotItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        if (selectedItem?.id === updated.id) {
+          setSelectedItem({ kind: 'screenshot', ...updated });
+        }
+        toast.info(updated.isFavorite ? 'Added to favorites.' : 'Removed from favorites.');
       }
-      toast.info(updated.isFavorite ? 'Added to favorites.' : 'Removed from favorites.');
-    } else {
-      const updated = await screenshotService.toggleFavorite(item.id);
-      setScreenshotItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      if (selectedItem?.id === updated.id) {
-        setSelectedItem({ kind: 'screenshot', ...updated });
-      }
-      toast.info(updated.isFavorite ? 'Added to favorites.' : 'Removed from favorites.');
+    } catch (err) {
+      reportActionError('Favorite update', err);
     }
   };
 
   const deleteItem = async (item: HistoryItem): Promise<boolean> => {
-    if (item.kind === 'clipboard') {
-      const success = await clipboardService.deleteEntry(item.id);
-      if (success) {
-        setClipboardItems((prev) => prev.filter((c) => c.id !== item.id));
-        if (selectedItem?.id === item.id) setSelectedItem(null);
-        toast.info('Item deleted.');
+    try {
+      if (item.kind === 'clipboard') {
+        const success = await clipboardService.deleteEntry(item.id);
+        if (success) {
+          setClipboardItems((prev) => prev.filter((c) => c.id !== item.id));
+          if (selectedItem?.id === item.id) setSelectedItem(null);
+          toast.info('Item deleted.');
+        } else {
+          toast.error('Failed to delete item.');
+        }
+        return success;
       }
-      return success;
-    } else {
+
       const success = await screenshotService.deleteScreenshot(item.id);
       if (success) {
         setScreenshotItems((prev) => prev.filter((s) => s.id !== item.id));
         if (selectedItem?.id === item.id) setSelectedItem(null);
         toast.info('Screenshot deleted.');
+      } else {
+        toast.error('Failed to delete screenshot.');
       }
       return success;
+    } catch (err) {
+      reportActionError('Delete', err);
+      return false;
     }
   };
 
   const clearClipboardHistory = async () => {
-    await clipboardService.clearHistory();
-    const updated = await clipboardService.getHistory();
-    setClipboardItems(updated);
-    if (selectedItem?.kind === 'clipboard' && !selectedItem.isPinned) {
-      setSelectedItem(null);
+    try {
+      await clipboardService.clearHistory();
+      const updated = await clipboardService.getHistory();
+      setClipboardItems(updated);
+      if (selectedItem?.kind === 'clipboard' && !selectedItem.isPinned) {
+        setSelectedItem(null);
+      }
+      toast.info('Clipboard history cleared (pinned preserved).');
+    } catch (err) {
+      reportActionError('Clear clipboard history', err);
     }
-    toast.info('Clipboard history cleared (pinned preserved).');
   };
 
   const captureScreenshot = async (type: CaptureType) => {
-    const shot = await screenshotService.captureScreen(type);
-    setScreenshotItems((prev) => [shot, ...prev]);
-    setSelectedItem({ kind: 'screenshot', ...shot });
-    toast.success('Screenshot saved.');
+    try {
+      const shot = await screenshotService.captureScreen(type);
+      setScreenshotItems((prev) => [shot, ...prev]);
+      setSelectedItem({ kind: 'screenshot', ...shot });
+      toast.success('Screenshot saved.');
+    } catch (err) {
+      reportActionError('Screenshot capture', err);
+      throw err;
+    }
   };
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
