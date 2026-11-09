@@ -220,23 +220,9 @@ export const SettingsView: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Ignore consecutive duplicates
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Do not add duplicate entries if the exact same content is copied consecutively.
-                    </div>
-                  </div>
-                  <Toggle
-                    checked={settings.clipboard.ignoreDuplicates}
-                    onChange={(checked) =>
-                      updateSettings({
-                        clipboard: { ...settings.clipboard, ignoreDuplicates: checked },
-                      })
-                    }
-                  />
+                <div className="rounded-btn border border-graphite-border bg-graphite-surface p-3 text-[11px] text-graphite-text-muted">
+                  Copying identical text again refreshes its timestamp instead of creating a
+                  duplicate history row.
                 </div>
               </SettingsSection>
 

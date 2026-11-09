@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   NavigationSection,
   HistoryItem,
@@ -97,6 +97,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const didApplyDefaultView = useRef(false);
 
   const refreshData = useCallback(async () => {
     const [clips, shots, currentSettings, stats] = await Promise.allSettled([
@@ -128,6 +129,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  useEffect(() => {
+    if (isLoading || didApplyDefaultView.current) return;
+    didApplyDefaultView.current = true;
+    setActiveSection(settings.general.defaultView);
+  }, [isLoading, settings.general.defaultView]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -268,10 +275,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await clipboardService.clearHistory();
       const updated = await clipboardService.getHistory();
       setClipboardItems(updated);
-      if (selectedItem?.kind === 'clipboard' && !selectedItem.isPinned) {
+      if (
+        selectedItem?.kind === 'clipboard' &&
+        !selectedItem.isPinned &&
+        !selectedItem.isFavorite
+      ) {
         setSelectedItem(null);
       }
-      toast.info('Clipboard history cleared (pinned preserved).');
+      toast.info('Clipboard history cleared (pinned and favorites preserved).');
     } catch (err) {
       reportActionError('Clear clipboard history', err);
     }
