@@ -13,7 +13,8 @@ export function filterHistory(items: HistoryItem[], query: SearchQuery): History
 
     if (
       query.filter === 'text' &&
-      (item.kind !== 'clipboard' || item.contentType === 'code' || item.contentType === 'url')
+      (item.kind !== 'clipboard' ||
+        !['text', 'multiline', 'json', 'color_code', 'path'].includes(item.contentType))
     ) {
       return false;
     }
@@ -21,6 +22,12 @@ export function filterHistory(items: HistoryItem[], query: SearchQuery): History
       return false;
     }
     if (query.filter === 'url' && (item.kind !== 'clipboard' || item.contentType !== 'url')) {
+      return false;
+    }
+    if (query.filter === 'images' && (item.kind !== 'clipboard' || item.contentType !== 'image')) {
+      return false;
+    }
+    if (query.filter === 'files' && (item.kind !== 'clipboard' || item.contentType !== 'files')) {
       return false;
     }
     if (query.filter === 'screenshots' && item.kind !== 'screenshot') {
@@ -33,7 +40,21 @@ export function filterHistory(items: HistoryItem[], query: SearchQuery): History
       const matchContent = item.content.toLowerCase().includes(q);
       const matchApp = item.sourceApp?.toLowerCase().includes(q) ?? false;
       const matchLang = item.language?.toLowerCase().includes(q) ?? false;
-      return matchContent || matchApp || matchLang;
+      const matchType = item.contentType.toLowerCase().includes(q);
+      const matchDimensions =
+        item.imageWidth != null &&
+        item.imageHeight != null &&
+        `${item.imageWidth}x${item.imageHeight}`.includes(q.replace(/\s/g, ''));
+      const matchFileCount =
+        item.fileCount != null && String(item.fileCount) === q.replace(/\s/g, '');
+      return (
+        matchContent ||
+        matchApp ||
+        matchLang ||
+        matchType ||
+        matchDimensions ||
+        matchFileCount
+      );
     }
 
     const matchOcr = item.ocrText?.toLowerCase().includes(q) ?? false;

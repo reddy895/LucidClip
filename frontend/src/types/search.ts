@@ -1,4 +1,11 @@
-export type SearchFilterType = 'all' | 'text' | 'code' | 'url' | 'screenshots';
+export type SearchFilterType =
+  | 'all'
+  | 'text'
+  | 'code'
+  | 'url'
+  | 'images'
+  | 'files'
+  | 'screenshots';
 export type SortOrder = 'newest' | 'oldest' | 'char_count' | 'source_app';
 
 export interface SearchQuery {

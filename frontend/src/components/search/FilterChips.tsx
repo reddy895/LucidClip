@@ -1,7 +1,7 @@
 import React from 'react';
 import { SearchFilterType } from '@/types';
 import { cn } from '@/utils';
-import { LayoutGrid, FileText, Code, Link as LinkIcon, Camera } from 'lucide-react';
+import { LayoutGrid, FileText, Code, Link as LinkIcon, Camera, Image as ImageIcon, Files } from 'lucide-react';
 
 export interface FilterChipsProps {
   activeFilter: SearchFilterType;
@@ -19,6 +19,8 @@ export const FilterChips: React.FC<FilterChipsProps> = ({
     { id: 'text', label: 'Text', icon: <FileText className="h-3.5 w-3.5" /> },
     { id: 'code', label: 'Code', icon: <Code className="h-3.5 w-3.5" /> },
     { id: 'url', label: 'URLs', icon: <LinkIcon className="h-3.5 w-3.5" /> },
+    { id: 'images', label: 'Images', icon: <ImageIcon className="h-3.5 w-3.5" /> },
+    { id: 'files', label: 'Files', icon: <Files className="h-3.5 w-3.5" /> },
     { id: 'screenshots', label: 'Screenshots', icon: <Camera className="h-3.5 w-3.5" /> },
   ];
 
