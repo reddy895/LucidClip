@@ -491,7 +491,7 @@ export const SettingsView: React.FC = () => {
                       LucidClip Desktop
                     </div>
                     <div className="text-xs text-graphite-text-muted">
-                      Version 1.0.0 (Production Desktop Build)
+                      Version {__APP_VERSION__}
                     </div>
                   </div>
                 </div>

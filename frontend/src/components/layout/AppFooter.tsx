@@ -17,7 +17,7 @@ export const AppFooter: React.FC = () => {
           <>
             <ShieldCheck className="h-3 w-3 text-status-success" />
             <span className="text-graphite-text-secondary">Monitoring Active</span>
-            <span className="hidden sm:inline text-graphite-text-muted">• Win32 Clipboard Hook</span>
+            <span className="hidden sm:inline text-graphite-text-muted">• Native clipboard monitor</span>
           </>
         ) : (
           <>
