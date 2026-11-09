@@ -61,6 +61,15 @@ pub const MIGRATIONS: &[Migration] = &[
               CREATE INDEX IF NOT EXISTS idx_screenshots_pinned ON screenshots(pinned);
               CREATE INDEX IF NOT EXISTS idx_screenshots_fav ON screenshots(favorite);",
     },
+    Migration {
+        version: 5,
+        description: "persist screenshot capture metadata",
+        sql: "ALTER TABLE screenshots ADD COLUMN capture_type TEXT NOT NULL DEFAULT 'fullscreen';
+              ALTER TABLE screenshots ADD COLUMN region_x INTEGER;
+              ALTER TABLE screenshots ADD COLUMN region_y INTEGER;
+              ALTER TABLE screenshots ADD COLUMN region_width INTEGER;
+              ALTER TABLE screenshots ADD COLUMN region_height INTEGER;",
+    },
 ];
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {

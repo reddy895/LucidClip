@@ -17,6 +17,11 @@ pub struct DbScreenshotEntry {
     pub created_at: i64,
     pub pinned: bool,
     pub favorite: bool,
+    pub capture_type: String,
+    pub region_x: Option<i32>,
+    pub region_y: Option<i32>,
+    pub region_width: Option<u32>,
+    pub region_height: Option<u32>,
 }
 
 pub struct ScreenshotRepo<'a> {
@@ -31,8 +36,8 @@ impl<'a> ScreenshotRepo<'a> {
     pub fn insert(&self, entry: &DbScreenshotEntry) -> Result<()> {
         self.pool.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO screenshots (id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                "INSERT INTO screenshots (id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite, capture_type, region_x, region_y, region_width, region_height)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 params![
                     entry.id,
                     entry.original_path,
@@ -44,6 +49,11 @@ impl<'a> ScreenshotRepo<'a> {
                     entry.created_at,
                     if entry.pinned { 1 } else { 0 },
                     if entry.favorite { 1 } else { 0 },
+                    entry.capture_type,
+                    entry.region_x,
+                    entry.region_y,
+                    entry.region_width,
+                    entry.region_height,
                 ],
             )?;
             Ok(())
@@ -53,7 +63,7 @@ impl<'a> ScreenshotRepo<'a> {
     pub fn find_by_id(&self, id: &str) -> Result<Option<DbScreenshotEntry>> {
         self.pool.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite
+                "SELECT id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite, capture_type, region_x, region_y, region_width, region_height
                  FROM screenshots WHERE id = ?1",
             )?;
             let mut rows = stmt.query([id])?;
@@ -70,6 +80,11 @@ impl<'a> ScreenshotRepo<'a> {
                     created_at: row.get(7)?,
                     pinned: row.get::<_, i64>(8)? != 0,
                     favorite: row.get::<_, i64>(9)? != 0,
+                    capture_type: row.get(10)?,
+                    region_x: row.get(11)?,
+                    region_y: row.get(12)?,
+                    region_width: row.get(13)?,
+                    region_height: row.get(14)?,
                 }))
             } else {
                 Ok(None)
@@ -80,7 +95,7 @@ impl<'a> ScreenshotRepo<'a> {
     pub fn list_all(&self) -> Result<Vec<DbScreenshotEntry>> {
         self.pool.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite
+                "SELECT id, original_path, thumbnail_path, width, height, file_size, ocr_text, created_at, pinned, favorite, capture_type, region_x, region_y, region_width, region_height
                  FROM screenshots ORDER BY created_at DESC",
             )?;
 
@@ -97,6 +112,11 @@ impl<'a> ScreenshotRepo<'a> {
                         created_at: row.get(7)?,
                         pinned: row.get::<_, i64>(8)? != 0,
                         favorite: row.get::<_, i64>(9)? != 0,
+                        capture_type: row.get(10)?,
+                        region_x: row.get(11)?,
+                        region_y: row.get(12)?,
+                        region_width: row.get(13)?,
+                        region_height: row.get(14)?,
                     })
                 })?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
