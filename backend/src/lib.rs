@@ -12,6 +12,7 @@ pub mod platform;
 pub mod security;
 pub mod commands;
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tauri::Manager;
 use crate::database::{run_migrations, DbPool};
@@ -22,22 +23,22 @@ use crate::storage::AppPaths;
 pub struct AppState {
     pub pool: Arc<DbPool>,
     pub paths: AppPaths,
-    pub is_initialized: Arc<std::sync::atomic::AtomicBool>,
+    pub monitor_stop: Arc<AtomicBool>,
 }
 
 impl AppState {
-    pub fn new(pool: Arc<DbPool>, paths: AppPaths) -> Self {
+    pub fn new(pool: Arc<DbPool>, paths: AppPaths, monitor_stop: Arc<AtomicBool>) -> Self {
         Self {
             pool,
             paths,
-            is_initialized: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            monitor_stop,
         }
     }
 }
 
 /// Main application runner invoked by main.rs
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .setup(|app| {
             println!("[LucidClip] Setting up application context...");
 
@@ -53,8 +54,11 @@ pub fn run() {
             run_migrations(&pool)
                 .expect("Failed to execute database migrations");
 
-            let state = AppState::new(pool, paths);
+            let monitor_stop = Arc::new(AtomicBool::new(false));
+            let state = AppState::new(pool.clone(), paths, monitor_stop.clone());
             app.manage(state);
+
+            clipboard::spawn_monitor(app.handle().clone(), pool, monitor_stop);
 
             println!("[LucidClip] Backend context initialized successfully.");
             Ok(())
@@ -75,6 +79,14 @@ pub fn run() {
             commands::update_setting,
             commands::get_storage_stats
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running LucidClip desktop application");
+        .build(tauri::generate_context!())
+        .expect("error while building LucidClip desktop application");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            if let Some(state) = app_handle.try_state::<AppState>() {
+                state.monitor_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    });
 }

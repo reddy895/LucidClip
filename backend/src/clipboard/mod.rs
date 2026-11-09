@@ -2,10 +2,12 @@
 
 pub mod classifier;
 pub mod hasher;
+pub mod monitor;
 pub mod service;
 
 pub use classifier::{classify_content, ClipboardContentType};
 pub use hasher::hash_content;
+pub use monitor::{spawn as spawn_monitor, CLIPBOARD_CAPTURED_EVENT};
 pub use service::ClipboardService;
 
 #[cfg(test)]
