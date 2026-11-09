@@ -201,6 +201,17 @@ pub fn get_settings(state: tauri::State<'_, AppState>) -> Result<HashMap<String,
 
 #[tauri::command]
 pub fn update_setting(key: String, value: String, state: tauri::State<'_, AppState>) -> Result<()> {
+    if key == "app_settings" {
+        if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&value) {
+            if let Some(enabled) = settings
+                .pointer("/general/launchOnStartup")
+                .and_then(serde_json::Value::as_bool)
+            {
+                crate::platform::set_launch_on_startup(enabled)?;
+            }
+        }
+    }
+
     let repo = SettingsRepo::new(&state.pool);
     repo.set(&key, &value)
 }

@@ -54,6 +54,19 @@ pub fn run() {
             run_migrations(&pool)
                 .expect("Failed to execute database migrations");
 
+            if let Ok(Some(raw)) = database::SettingsRepo::new(&pool).get("app_settings") {
+                if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    if let Some(enabled) = settings
+                        .pointer("/general/launchOnStartup")
+                        .and_then(serde_json::Value::as_bool)
+                    {
+                        if let Err(err) = platform::set_launch_on_startup(enabled) {
+                            eprintln!("[LucidClip] Failed to sync launch at startup: {err}");
+                        }
+                    }
+                }
+            }
+
             let service = clipboard::ClipboardService::new(&pool);
             match service.enforce_retention() {
                 Ok(removed) if removed > 0 => {
