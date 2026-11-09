@@ -1,15 +1,15 @@
 //! SQLite Database Module
 
+pub mod clipboard_repo;
 pub mod connection;
 pub mod migrations;
-pub mod clipboard_repo;
 pub mod screenshot_repo;
 pub mod settings_repo;
 
+pub use clipboard_repo::{ClipboardRepo, DbClipboardEntry};
 pub use connection::DbPool;
 pub use migrations::run_migrations;
-pub use clipboard_repo::{ClipboardRepo, DbClipboardEntry};
-pub use screenshot_repo::{ScreenshotRepo, DbScreenshotEntry};
+pub use screenshot_repo::{DbScreenshotEntry, ScreenshotRepo};
 pub use settings_repo::SettingsRepo;
 
 #[cfg(test)]

@@ -1,9 +1,9 @@
 //! Screenshot Repository for SQLite persistence
 
-use rusqlite::params;
-use serde::{Deserialize, Serialize};
 use crate::database::connection::DbPool;
 use crate::errors::{AppError, Result};
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbScreenshotEntry {
@@ -127,11 +127,13 @@ impl<'a> ScreenshotRepo<'a> {
 
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
         self.pool.with_conn(|conn| {
-            let current_pin: i64 = conn.query_row(
-                "SELECT pinned FROM screenshots WHERE id = ?1",
-                [id],
-                |row| row.get(0),
-            ).map_err(|_| AppError::NotFound(format!("Screenshot entry not found: {id}")))?;
+            let current_pin: i64 = conn
+                .query_row(
+                    "SELECT pinned FROM screenshots WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| AppError::NotFound(format!("Screenshot entry not found: {id}")))?;
 
             let new_pin = if current_pin != 0 { 0 } else { 1 };
             conn.execute(
@@ -145,11 +147,13 @@ impl<'a> ScreenshotRepo<'a> {
 
     pub fn toggle_favorite(&self, id: &str) -> Result<bool> {
         self.pool.with_conn(|conn| {
-            let current_fav: i64 = conn.query_row(
-                "SELECT favorite FROM screenshots WHERE id = ?1",
-                [id],
-                |row| row.get(0),
-            ).map_err(|_| AppError::NotFound(format!("Screenshot entry not found: {id}")))?;
+            let current_fav: i64 = conn
+                .query_row(
+                    "SELECT favorite FROM screenshots WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| AppError::NotFound(format!("Screenshot entry not found: {id}")))?;
 
             let new_fav = if current_fav != 0 { 0 } else { 1 };
             conn.execute(
@@ -170,11 +174,8 @@ impl<'a> ScreenshotRepo<'a> {
 
     pub fn count(&self) -> Result<usize> {
         self.pool.with_conn(|conn| {
-            let count: usize = conn.query_row(
-                "SELECT COUNT(*) FROM screenshots",
-                [],
-                |row| row.get(0),
-            )?;
+            let count: usize =
+                conn.query_row("SELECT COUNT(*) FROM screenshots", [], |row| row.get(0))?;
             Ok(count)
         })
     }

@@ -1,10 +1,10 @@
 //! Settings Repository for SQLite persistence
 
-use std::collections::HashMap;
-use chrono::Utc;
-use rusqlite::params;
 use crate::database::connection::DbPool;
 use crate::errors::Result;
+use chrono::Utc;
+use rusqlite::params;
+use std::collections::HashMap;
 
 pub struct SettingsRepo<'a> {
     pool: &'a DbPool,
@@ -43,7 +43,9 @@ impl<'a> SettingsRepo<'a> {
     pub fn get_all(&self) -> Result<HashMap<String, String>> {
         self.pool.with_conn(|conn| {
             let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
-            let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
 
             let mut map = HashMap::new();
             for item in rows {

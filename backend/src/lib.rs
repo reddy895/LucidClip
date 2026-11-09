@@ -1,20 +1,20 @@
 //! LucidClip Desktop Backend Application
 //! Entry point and Tauri 2 integration.
 
+pub mod clipboard;
+pub mod commands;
+pub mod database;
 pub mod errors;
+pub mod platform;
+pub mod screenshots;
 pub mod settings;
 pub mod storage;
-pub mod database;
-pub mod clipboard;
-pub mod screenshots;
-pub mod platform;
-pub mod commands;
 
+use crate::database::{run_migrations, DbPool};
+use crate::storage::AppPaths;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tauri::Manager;
-use crate::database::{run_migrations, DbPool};
-use crate::storage::AppPaths;
 
 /// Core application state managed by Tauri runtime
 #[derive(Clone)]
@@ -41,16 +41,15 @@ pub fn run() {
             println!("[LucidClip] Setting up application context...");
 
             let paths = AppPaths::default_paths();
-            paths.ensure_dirs_exist()
+            paths
+                .ensure_dirs_exist()
                 .expect("Failed to initialize LucidClip application directories");
 
             let pool = Arc::new(
-                DbPool::open(&paths.database_path)
-                    .expect("Failed to open SQLite database")
+                DbPool::open(&paths.database_path).expect("Failed to open SQLite database"),
             );
 
-            run_migrations(&pool)
-                .expect("Failed to execute database migrations");
+            run_migrations(&pool).expect("Failed to execute database migrations");
 
             if let Ok(Some(raw)) = database::SettingsRepo::new(&pool).get("app_settings") {
                 if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&raw) {
@@ -109,7 +108,9 @@ pub fn run() {
     app.run(|app_handle, event| {
         if let tauri::RunEvent::Exit = event {
             if let Some(state) = app_handle.try_state::<AppState>() {
-                state.monitor_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                state
+                    .monitor_stop
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
             }
         }
     });

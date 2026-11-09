@@ -1,8 +1,8 @@
 //! SQLite Database Migrations System
 
-use chrono::Utc;
 use crate::database::connection::DbPool;
 use crate::errors::Result;
+use chrono::Utc;
 
 pub struct Migration {
     pub version: i64,
@@ -53,7 +53,8 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 4,
         description: "create indexes for performance and search",
-        sql: "CREATE INDEX IF NOT EXISTS idx_clipboard_created ON clipboard_entries(created_at DESC);
+        sql:
+            "CREATE INDEX IF NOT EXISTS idx_clipboard_created ON clipboard_entries(created_at DESC);
               CREATE INDEX IF NOT EXISTS idx_clipboard_pinned ON clipboard_entries(pinned);
               CREATE INDEX IF NOT EXISTS idx_clipboard_fav ON clipboard_entries(favorite);
               CREATE INDEX IF NOT EXISTS idx_clipboard_type ON clipboard_entries(content_type);

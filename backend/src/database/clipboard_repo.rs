@@ -1,9 +1,9 @@
 //! Clipboard Repository for SQLite persistence
 
-use rusqlite::params;
-use serde::{Deserialize, Serialize};
 use crate::database::connection::DbPool;
 use crate::errors::{AppError, Result};
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbClipboardEntry {
@@ -134,11 +134,13 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
         self.pool.with_conn(|conn| {
-            let current_pin: i64 = conn.query_row(
-                "SELECT pinned FROM clipboard_entries WHERE id = ?1",
-                [id],
-                |row| row.get(0),
-            ).map_err(|_| AppError::NotFound(format!("Clipboard entry not found: {id}")))?;
+            let current_pin: i64 = conn
+                .query_row(
+                    "SELECT pinned FROM clipboard_entries WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| AppError::NotFound(format!("Clipboard entry not found: {id}")))?;
 
             let new_pin = if current_pin != 0 { 0 } else { 1 };
             conn.execute(
@@ -152,11 +154,13 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn toggle_favorite(&self, id: &str) -> Result<bool> {
         self.pool.with_conn(|conn| {
-            let current_fav: i64 = conn.query_row(
-                "SELECT favorite FROM clipboard_entries WHERE id = ?1",
-                [id],
-                |row| row.get(0),
-            ).map_err(|_| AppError::NotFound(format!("Clipboard entry not found: {id}")))?;
+            let current_fav: i64 = conn
+                .query_row(
+                    "SELECT favorite FROM clipboard_entries WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| AppError::NotFound(format!("Clipboard entry not found: {id}")))?;
 
             let new_fav = if current_fav != 0 { 0 } else { 1 };
             conn.execute(
@@ -216,11 +220,10 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn count(&self) -> Result<usize> {
         self.pool.with_conn(|conn| {
-            let count: usize = conn.query_row(
-                "SELECT COUNT(*) FROM clipboard_entries",
-                [],
-                |row| row.get(0),
-            )?;
+            let count: usize =
+                conn.query_row("SELECT COUNT(*) FROM clipboard_entries", [], |row| {
+                    row.get(0)
+                })?;
             Ok(count)
         })
     }

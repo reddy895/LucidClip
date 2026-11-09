@@ -1,9 +1,9 @@
 //! LucidClip Application Storage Paths Management
 
+use crate::errors::{AppError, Result};
+use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
-use directories::ProjectDirs;
-use crate::errors::{AppError, Result};
 
 #[derive(Debug, Clone)]
 pub struct AppPaths {
@@ -52,10 +52,16 @@ impl AppPaths {
     pub fn ensure_dirs_exist(&self) -> Result<()> {
         fs::create_dir_all(&self.root_dir)
             .map_err(|e| AppError::Storage(format!("Failed to create root directory: {e}")))?;
-        fs::create_dir_all(&self.originals_dir)
-            .map_err(|e| AppError::Storage(format!("Failed to create screenshots originals directory: {e}")))?;
-        fs::create_dir_all(&self.thumbnails_dir)
-            .map_err(|e| AppError::Storage(format!("Failed to create screenshots thumbnails directory: {e}")))?;
+        fs::create_dir_all(&self.originals_dir).map_err(|e| {
+            AppError::Storage(format!(
+                "Failed to create screenshots originals directory: {e}"
+            ))
+        })?;
+        fs::create_dir_all(&self.thumbnails_dir).map_err(|e| {
+            AppError::Storage(format!(
+                "Failed to create screenshots thumbnails directory: {e}"
+            ))
+        })?;
         fs::create_dir_all(&self.logs_dir)
             .map_err(|e| AppError::Storage(format!("Failed to create logs directory: {e}")))?;
 

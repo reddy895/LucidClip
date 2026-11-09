@@ -1,10 +1,10 @@
 //! Clipboard Service coordinating classification, deduplication, and persistence
 
-use chrono::Utc;
 use crate::clipboard::classifier::classify_content;
 use crate::clipboard::hasher::hash_content;
 use crate::database::{ClipboardRepo, DbClipboardEntry, DbPool, SettingsRepo};
 use crate::errors::Result;
+use chrono::Utc;
 
 const DEFAULT_MAX_HISTORY_ITEMS: usize = 500;
 const DEFAULT_AUTO_CLEANUP_DAYS: u32 = 30;
@@ -90,8 +90,8 @@ impl<'a> ClipboardService<'a> {
         let mut removed = self.repo.enforce_max_items(max_items)?;
 
         if cleanup_days > 0 {
-            let cutoff = Utc::now().timestamp_millis()
-                - i64::from(cleanup_days) * 24 * 60 * 60 * 1_000;
+            let cutoff =
+                Utc::now().timestamp_millis() - i64::from(cleanup_days) * 24 * 60 * 60 * 1_000;
             removed += self.repo.purge_older_than(cutoff)?;
         }
 
@@ -152,9 +152,7 @@ mod tests {
 
         let oldest = repo.list_all().unwrap().last().cloned().unwrap();
         repo.toggle_pin(&oldest.id).unwrap();
-        service
-            .process_copied_text("entry 12", None)
-            .unwrap();
+        service.process_copied_text("entry 12", None).unwrap();
         assert!(repo.find_by_id(&oldest.id).unwrap().is_some());
     }
 

@@ -26,8 +26,9 @@ mod windows_screenshot {
     use std::ptr;
 
     use windows_sys::Win32::Graphics::Gdi::{
-        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
-        ReleaseDC, SelectObject, BITMAPINFO, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, SRCCOPY,
+        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
+        GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
+        HGDIOBJ, SRCCOPY,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
@@ -155,8 +156,8 @@ mod windows_screenshot {
             }
 
             let mut info: BITMAPINFO = std::mem::zeroed();
-            info.bmiHeader.biSize = size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPINFOHEADER>()
-                as u32;
+            info.bmiHeader.biSize =
+                size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPINFOHEADER>() as u32;
             info.bmiHeader.biWidth = width as i32;
             info.bmiHeader.biHeight = -(height as i32);
             info.bmiHeader.biPlanes = 1;

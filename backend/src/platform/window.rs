@@ -43,9 +43,7 @@ mod windows_window {
         }
 
         let mut process_id = 0u32;
-        if unsafe { GetWindowThreadProcessId(window, &mut process_id) } == 0
-            || process_id == 0
-        {
+        if unsafe { GetWindowThreadProcessId(window, &mut process_id) } == 0 || process_id == 0 {
             return Ok(None);
         }
 
@@ -56,9 +54,8 @@ mod windows_window {
 
         let mut buffer = [0u16; MAX_PATH_UNITS];
         let mut size = MAX_PATH_UNITS as u32;
-        let success = unsafe {
-            QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size)
-        };
+        let success =
+            unsafe { QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size) };
 
         unsafe {
             CloseHandle(process);

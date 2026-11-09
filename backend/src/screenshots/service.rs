@@ -39,7 +39,6 @@ impl CaptureMode {
             CaptureMode::Region(_) => "region",
         }
     }
-
 }
 
 pub struct ScreenshotService<'a> {
@@ -71,12 +70,8 @@ impl<'a> ScreenshotService<'a> {
             }
         };
 
-        let image = platform::capture_screen_region(
-            region.x,
-            region.y,
-            region.width,
-            region.height,
-        )?;
+        let image =
+            platform::capture_screen_region(region.x, region.y, region.width, region.height)?;
 
         self.store(image, mode.as_str(), Some(region))
     }
@@ -99,7 +94,12 @@ impl<'a> ScreenshotService<'a> {
         validate_crop_region(source_width, source_height, region)?;
 
         let cropped = dynamic
-            .crop_imm(region.x as u32, region.y as u32, region.width, region.height)
+            .crop_imm(
+                region.x as u32,
+                region.y as u32,
+                region.width,
+                region.height,
+            )
             .to_rgba8();
 
         let absolute_region = CaptureRegion {
@@ -221,16 +221,12 @@ impl<'a> ScreenshotService<'a> {
         if deleted {
             if let Err(err) = fs::remove_file(&entry.original_path) {
                 if err.kind() != std::io::ErrorKind::NotFound {
-                    eprintln!(
-                        "[LucidClip Screenshots] Failed to remove original image: {err}"
-                    );
+                    eprintln!("[LucidClip Screenshots] Failed to remove original image: {err}");
                 }
             }
             if let Err(err) = fs::remove_file(&entry.thumbnail_path) {
                 if err.kind() != std::io::ErrorKind::NotFound {
-                    eprintln!(
-                        "[LucidClip Screenshots] Failed to remove thumbnail image: {err}"
-                    );
+                    eprintln!("[LucidClip Screenshots] Failed to remove thumbnail image: {err}");
                 }
             }
         }
@@ -247,7 +243,11 @@ fn remove_file_if_exists(path: &Path) {
     }
 }
 
-fn validate_crop_region(source_width: u32, source_height: u32, region: CaptureRegion) -> Result<()> {
+fn validate_crop_region(
+    source_width: u32,
+    source_height: u32,
+    region: CaptureRegion,
+) -> Result<()> {
     if region.width == 0 || region.height == 0 {
         return Err(AppError::InvalidInput(
             "Screenshot region must have a positive width and height".into(),
@@ -290,10 +290,7 @@ pub fn validate_region(bounds: &ScreenBounds, region: CaptureRegion) -> Result<(
     let bounds_right = bounds.x as i64 + bounds.width as i64;
     let bounds_bottom = bounds.y as i64 + bounds.height as i64;
 
-    if region.x < bounds.x
-        || region.y < bounds.y
-        || right > bounds_right
-        || bottom > bounds_bottom
+    if region.x < bounds.x || region.y < bounds.y || right > bounds_right || bottom > bounds_bottom
     {
         return Err(AppError::InvalidInput(
             "Screenshot region is outside the visible desktop".into(),

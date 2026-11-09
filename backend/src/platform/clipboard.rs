@@ -98,7 +98,6 @@ mod windows_clipboard {
         Ok(())
     }
 
-
     pub fn write_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
         if width == 0 || height == 0 {
             return Err(AppError::Clipboard(
@@ -154,11 +153,7 @@ mod windows_clipboard {
             std::ptr::write_bytes(header, 0, HEADER_SIZE);
 
             let write_u32 = |offset: usize, value: u32| {
-                std::ptr::copy_nonoverlapping(
-                    value.to_le_bytes().as_ptr(),
-                    header.add(offset),
-                    4,
-                );
+                std::ptr::copy_nonoverlapping(value.to_le_bytes().as_ptr(), header.add(offset), 4);
             };
             write_u32(0, HEADER_SIZE as u32); // biSize
             write_u32(4, width); // biWidth

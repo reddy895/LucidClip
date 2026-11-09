@@ -67,9 +67,8 @@ mod windows_startup {
         let subkey = wide(RUN_KEY);
         let mut key: HKEY = ptr::null_mut();
 
-        let status = unsafe {
-            RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, access, &mut key)
-        };
+        let status =
+            unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, access, &mut key) };
 
         if status != ERROR_SUCCESS {
             return Err(AppError::System(format!(

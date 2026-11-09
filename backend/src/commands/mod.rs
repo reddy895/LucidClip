@@ -1,13 +1,13 @@
 //! Tauri IPC Command Handlers
 
-use std::collections::HashMap;
-use std::fs;
-use serde::{Deserialize, Serialize};
 use crate::clipboard::ClipboardService;
 use crate::database::{DbClipboardEntry, DbScreenshotEntry, SettingsRepo};
 use crate::errors::{AppError, Result};
 use crate::screenshots::{CaptureMode, CaptureRegion, ScreenshotService};
 use crate::AppState;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageStatsDto {
@@ -96,9 +96,7 @@ pub fn capture_screenshot(
         "fullscreen" => CaptureMode::Fullscreen,
         "region" => {
             let region = region.ok_or_else(|| {
-                AppError::InvalidInput(
-                    "A capture region is required for region screenshots".into(),
-                )
+                AppError::InvalidInput("A capture region is required for region screenshots".into())
             })?;
             CaptureMode::Region(CaptureRegion {
                 x: region.x,
@@ -224,8 +222,8 @@ pub fn get_storage_stats(state: tauri::State<'_, AppState>) -> Result<StorageSta
         Err(err) => return Err(err.into()),
     };
 
-    let screenshot_storage_bytes = directory_size(&state.paths.originals_dir)?
-        + directory_size(&state.paths.thumbnails_dir)?;
+    let screenshot_storage_bytes =
+        directory_size(&state.paths.originals_dir)? + directory_size(&state.paths.thumbnails_dir)?;
 
     let entry_count = crate::database::ClipboardRepo::new(&state.pool).count()?;
     let screenshot_count = crate::database::ScreenshotRepo::new(&state.pool).count()?;
