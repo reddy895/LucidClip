@@ -56,6 +56,17 @@ pub fn copy_clipboard_entry_by_id(id: String, state: tauri::State<'_, AppState>)
             let path = entry.image_path.as_deref().ok_or_else(|| {
                 AppError::Clipboard(format!("Clipboard image {id} has no stored file"))
             })?;
+            let path = std::path::Path::new(path);
+            if !path.starts_with(&state.paths.screenshots_dir) {
+                return Err(AppError::InvalidInput(
+                    "Clipboard image path is outside the application data directory".into(),
+                ));
+            }
+            if !path.is_file() {
+                return Err(AppError::NotFound(format!(
+                    "Clipboard image file for {id} is missing"
+                )));
+            }
             let image = image::open(path)?.to_rgba8();
             crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
         }

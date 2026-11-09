@@ -17,6 +17,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn clipboard_media_metadata_round_trips() {
+        let pool = DbPool::open_in_memory().expect("failed to open in-memory db");
+        run_migrations(&pool).expect("failed to run migrations");
+        let repo = ClipboardRepo::new(&pool);
+
+        let entry = DbClipboardEntry {
+            id: "clip-media".to_string(),
+            content: String::new(),
+            content_type: "image".to_string(),
+            source_app: Some("msedge.exe".to_string()),
+            created_at: 2000,
+            content_hash: "media-hash".to_string(),
+            pinned: false,
+            favorite: false,
+            image_path: Some(r"C:\Data\originals\clip-media.png".to_string()),
+            thumbnail_path: Some(r"C:\Data\thumbnails\clip-media.png".to_string()),
+            image_width: Some(1920),
+            image_height: Some(1080),
+            byte_size: 4_096,
+            file_count: 0,
+        };
+        repo.insert(&entry).expect("failed to insert media entry");
+
+        let stored = repo.find_by_id("clip-media").unwrap().unwrap();
+        assert_eq!(stored.image_path, entry.image_path);
+        assert_eq!(stored.thumbnail_path, entry.thumbnail_path);
+        assert_eq!(stored.image_width, Some(1920));
+        assert_eq!(stored.image_height, Some(1080));
+        assert_eq!(stored.byte_size, 4_096);
+        assert_eq!(stored.file_count, 0);
+    }
+
+    #[test]
     fn test_migrations_and_repositories() {
         let pool = DbPool::open_in_memory().expect("failed to open in-memory db");
         run_migrations(&pool).expect("failed to run migrations");
