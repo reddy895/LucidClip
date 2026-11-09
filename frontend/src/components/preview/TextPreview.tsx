@@ -94,7 +94,7 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
                 <img
                   src={entry.imageUrl}
                   alt="Clipboard preview"
-                  className="mx-auto max-h-[420px] w-auto rounded-[3px] object-contain"
+                  className="mx-auto max-h-[420px] max-w-full rounded-[3px] object-contain"
                 />
               ) : (
                 <p className="p-3 text-xs text-status-error">
