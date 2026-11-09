@@ -33,7 +33,14 @@ export const ClipboardView: React.FC = () => {
           const matchContent = item.content.toLowerCase().includes(q);
           const matchApp = item.sourceApp?.toLowerCase().includes(q) ?? false;
           const matchLang = item.language?.toLowerCase().includes(q) ?? false;
-          return matchContent || matchApp || matchLang;
+          const matchKind = item.contentType.toLowerCase().includes(q);
+          const matchDimensions =
+            item.imageWidth != null &&
+            item.imageHeight != null &&
+            `${item.imageWidth}x${item.imageHeight}`.includes(q.replace(/\s/g, ''));
+          const matchFileCount =
+            item.fileCount != null && String(item.fileCount) === q.replace(/\s/g, '');
+          return matchContent || matchApp || matchLang || matchKind || matchDimensions || matchFileCount;
         }
         return true;
       })
