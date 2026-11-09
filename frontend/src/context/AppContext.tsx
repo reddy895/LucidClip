@@ -152,6 +152,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         entry,
         ...previous.filter((item) => item.id !== entry.id),
       ]);
+      setSelectedItem((previous) =>
+        previous?.kind === 'clipboard' && previous.id === entry.id
+          ? { kind: 'clipboard', ...entry }
+          : previous
+      );
+      void storageService
+        .getStorageUsage()
+        .then(setStorageStats)
+        .catch((err) =>
+          console.error('[LucidClip] Failed to refresh storage after capture', err)
+        );
     })
       .then((dispose) => {
         if (cancelled) {
