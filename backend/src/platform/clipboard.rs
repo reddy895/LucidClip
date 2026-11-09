@@ -31,6 +31,10 @@ mod windows_clipboard {
 
     use windows_sys::Win32::Foundation::{GetLastError, GlobalFree, HGLOBAL};
     use windows_sys::Win32::Globalization::MultiByteToWideChar;
+    use windows_sys::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, DeleteDC, GetDC, GetDIBits, GetObjectW, ReleaseDC, SelectObject,
+        BITMAP, BITMAPINFO, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+    };
     use windows_sys::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
         OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
@@ -39,7 +43,10 @@ mod windows_clipboard {
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
 
-    use super::{build_dropfiles, parse_dib, parse_file_list, ClipboardSnapshot, MAX_TEXT_BYTES};
+    use super::{
+        build_dropfiles, parse_dib, parse_file_list, ClipboardSnapshot, MAX_IMAGE_BYTES,
+        MAX_TEXT_BYTES,
+    };
     use crate::errors::{AppError, Result};
     use crate::platform::CapturedImage;
 
@@ -48,6 +55,9 @@ mod windows_clipboard {
 
     /// Legacy ANSI text format used by some older applications.
     const CF_TEXT: u32 = 1;
+
+    /// Device-dependent bitmap handle format.
+    const CF_BITMAP: u32 = 2;
 
     /// Device-independent bitmap format.
     const CF_DIB: u32 = 8;
@@ -364,6 +374,18 @@ mod windows_clipboard {
             }
         }
 
+        if unsafe { IsClipboardFormatAvailable(CF_BITMAP) } != 0 {
+            match read_bitmap_handle() {
+                Ok(Some(image)) => return Ok(Some(ClipboardSnapshot::Image(image))),
+                Ok(None) => {}
+                Err(err) => {
+                    eprintln!(
+                        "[LucidClip Clipboard] Could not read clipboard bitmap handle: {err}"
+                    );
+                }
+            }
+        }
+
         if let Some(text) = read_unicode_text()? {
             return Ok(Some(ClipboardSnapshot::Text(text)));
         }
@@ -517,6 +539,136 @@ mod windows_clipboard {
             Ok(files) => Ok(Some(files)),
             Err(err) => Err(err),
         }
+    }
+
+    struct BitmapContext {
+        screen_dc: HDC,
+        memory_dc: HDC,
+        previous: HGDIOBJ,
+    }
+
+    impl Drop for BitmapContext {
+        fn drop(&mut self) {
+            unsafe {
+                if !self.previous.is_null() {
+                    SelectObject(self.memory_dc, self.previous);
+                }
+                if !self.memory_dc.is_null() {
+                    DeleteDC(self.memory_dc);
+                }
+                if !self.screen_dc.is_null() {
+                    ReleaseDC(ptr::null_mut(), self.screen_dc);
+                }
+            }
+        }
+    }
+
+    fn read_bitmap_handle() -> Result<Option<CapturedImage>> {
+        let handle = unsafe { GetClipboardData(CF_BITMAP) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+        let bitmap = handle as HBITMAP;
+
+        let screen_dc = unsafe { GetDC(ptr::null_mut()) };
+        if screen_dc.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to acquire a device context for the clipboard bitmap".into(),
+            ));
+        }
+        let memory_dc = unsafe { CreateCompatibleDC(screen_dc) };
+        if memory_dc.is_null() {
+            unsafe {
+                ReleaseDC(ptr::null_mut(), screen_dc);
+            }
+            return Err(AppError::Clipboard(
+                "Failed to create a device context for the clipboard bitmap".into(),
+            ));
+        }
+        let previous = unsafe { SelectObject(memory_dc, bitmap as HGDIOBJ) };
+        if previous.is_null() {
+            unsafe {
+                DeleteDC(memory_dc);
+                ReleaseDC(ptr::null_mut(), screen_dc);
+            }
+            return Err(AppError::Clipboard(
+                "Failed to select the clipboard bitmap".into(),
+            ));
+        }
+        let context = BitmapContext {
+            screen_dc,
+            memory_dc,
+            previous,
+        };
+
+        let mut bitmap_info: BITMAP = unsafe { std::mem::zeroed() };
+        let measured = unsafe {
+            GetObjectW(
+                bitmap,
+                std::mem::size_of::<BITMAP>() as i32,
+                &mut bitmap_info as *mut BITMAP as *mut std::ffi::c_void,
+            )
+        };
+        if measured == 0 || bitmap_info.bmWidth <= 0 || bitmap_info.bmHeight <= 0 {
+            return Err(AppError::Clipboard(
+                "Windows returned invalid bitmap-handle dimensions".into(),
+            ));
+        }
+
+        let width = bitmap_info.bmWidth as u32;
+        let height = bitmap_info.bmHeight as u32;
+        if width > 32_768 || height > 32_768 {
+            return Err(AppError::Clipboard(
+                "Clipboard bitmap dimensions are too large".into(),
+            ));
+        }
+        let byte_len = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| AppError::Clipboard("Clipboard bitmap size overflowed".into()))?;
+        if byte_len > MAX_IMAGE_BYTES {
+            return Err(AppError::Clipboard(
+                "Clipboard bitmap is larger than the supported limit".into(),
+            ));
+        }
+
+        let mut info: BITMAPINFO = unsafe { std::mem::zeroed() };
+        info.bmiHeader.biSize =
+            std::mem::size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPINFOHEADER>() as u32;
+        info.bmiHeader.biWidth = width as i32;
+        info.bmiHeader.biHeight = -(height as i32);
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+
+        let mut buffer = vec![0u8; byte_len];
+        let lines = unsafe {
+            GetDIBits(
+                context.memory_dc,
+                bitmap,
+                0,
+                height,
+                buffer.as_mut_ptr() as *mut std::ffi::c_void,
+                &mut info,
+                DIB_RGB_COLORS,
+            )
+        };
+        if lines == 0 {
+            return Err(AppError::Clipboard(
+                "Failed to read pixels from the clipboard bitmap".into(),
+            ));
+        }
+
+        for pixel in buffer.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+            pixel[3] = 255;
+        }
+
+        Ok(Some(CapturedImage {
+            width,
+            height,
+            rgba: buffer,
+        }))
     }
 
     fn read_image(format: u32) -> Result<Option<CapturedImage>> {

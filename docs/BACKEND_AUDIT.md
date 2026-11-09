@@ -10,7 +10,7 @@
 ## 2. Implemented Surface
 
 - Native Windows clipboard notifications with polling fallback.
-- Windows clipboard Unicode/ANSI text, `CF_DIB`/`CF_DIBV5` image, and `CF_HDROP` file-list capture.
+- Windows clipboard Unicode/ANSI text, `CF_DIB`/`CF_DIBV5` and `CF_BITMAP` image, and `CF_HDROP` file-list capture.
 - Clipboard text, image, and file-list restore, including clipboard image thumbnails.
 - Foreground process lookup and sensitive-format detection.
 - Background clipboard monitoring with pause, exclusions, deduplication, retention, and media cleanup.
