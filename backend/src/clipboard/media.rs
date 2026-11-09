@@ -115,6 +115,47 @@ mod tests {
     }
 
     #[test]
+    fn remove_refuses_paths_outside_the_app_data_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-media-boundary-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let outside = root
+            .parent()
+            .unwrap()
+            .join(format!("lucidclip-outside-{}.png", std::process::id()));
+        fs::write(&outside, b"keep").unwrap();
+        let entry = DbClipboardEntry {
+            id: "clip_outside".into(),
+            content: String::new(),
+            content_type: "image".into(),
+            source_app: None,
+            created_at: 0,
+            content_hash: "hash".into(),
+            pinned: false,
+            favorite: false,
+            image_path: Some(outside.to_string_lossy().into_owned()),
+            thumbnail_path: None,
+            image_width: Some(1),
+            image_height: Some(1),
+            byte_size: 4,
+            file_count: 0,
+        };
+
+        remove(&paths, &entry);
+        assert!(outside.exists());
+        let _ = fs::remove_file(outside);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn image_hash_includes_dimensions_and_pixels() {
         let image = sample_image();
         let mut changed = sample_image();

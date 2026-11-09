@@ -393,6 +393,43 @@ mod tests {
     }
 
     #[test]
+    fn clear_unpinned_removes_only_unprotected_media() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-clear-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ClipboardService::with_paths(&pool, &paths);
+
+        let image = |red: u8| CapturedImage {
+            rgba: vec![
+                red, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            width: 2,
+            height: 2,
+        };
+        let pinned = service.process_copied_image(image(1), None).unwrap();
+        let favorite = service.process_copied_image(image(2), None).unwrap();
+        let removable = service.process_copied_image(image(3), None).unwrap();
+        service.toggle_pin(&pinned.id).unwrap();
+        service.toggle_favorite(&favorite.id).unwrap();
+
+        assert_eq!(service.clear_unpinned().unwrap(), 1);
+        assert!(std::path::Path::new(pinned.image_path.as_ref().unwrap()).exists());
+        assert!(std::path::Path::new(favorite.image_path.as_ref().unwrap()).exists());
+        assert!(!std::path::Path::new(removable.image_path.as_ref().unwrap()).exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn orphan_cleanup_removes_only_unreferenced_clipboard_media() {
         let root = std::env::temp_dir().join(format!(
             "lucidclip-orphans-{}-{}",
