@@ -305,15 +305,23 @@ mod windows_clipboard {
         let _session = ClipboardSession::open()?;
 
         if unsafe { IsClipboardFormatAvailable(CF_HDROP) } != 0 {
-            if let Some(files) = read_files()? {
-                return Ok(Some(ClipboardSnapshot::Files(files)));
+            match read_files() {
+                Ok(Some(files)) => return Ok(Some(ClipboardSnapshot::Files(files))),
+                Ok(None) => {}
+                Err(err) => {
+                    eprintln!("[LucidClip Clipboard] Could not read clipboard files: {err}");
+                }
             }
         }
 
         for format in [CF_DIB, CF_DIBV5] {
             if unsafe { IsClipboardFormatAvailable(format) } != 0 {
-                if let Some(image) = read_image(format)? {
-                    return Ok(Some(ClipboardSnapshot::Image(image)));
+                match read_image(format) {
+                    Ok(Some(image)) => return Ok(Some(ClipboardSnapshot::Image(image))),
+                    Ok(None) => {}
+                    Err(err) => {
+                        eprintln!("[LucidClip Clipboard] Could not read clipboard bitmap: {err}");
+                    }
                 }
             }
         }
