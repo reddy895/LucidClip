@@ -236,7 +236,7 @@ export const SettingsView: React.FC = () => {
                       Maximum history entries
                     </div>
                     <div className="text-[11px] text-graphite-text-muted">
-                      Older non-pinned entries are purged when this limit is reached.
+                      Older unpinned, non-favorite entries are purged when this limit is reached.
                     </div>
                   </div>
                   <Select
@@ -496,7 +496,7 @@ export const SettingsView: React.FC = () => {
 
                 <div className="flex items-center gap-2 pt-2 text-[11px] text-graphite-text-muted">
                   <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
-                  <span>Windows 10 / 11 64-bit Compatible</span>
+                  <span>Targets Windows 10 / 11 64-bit</span>
                 </div>
               </SettingsSection>
             </div>
