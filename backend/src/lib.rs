@@ -73,6 +73,7 @@ pub fn run() {
             commands::clear_clipboard_history,
             commands::get_screenshots,
             commands::capture_screenshot,
+            commands::crop_screenshot,
             commands::delete_screenshot,
             commands::toggle_screenshot_pin,
             commands::toggle_screenshot_favorite,

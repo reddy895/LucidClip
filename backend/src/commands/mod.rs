@@ -117,6 +117,26 @@ pub fn capture_screenshot(
 }
 
 #[tauri::command]
+pub fn crop_screenshot(
+    source_id: String,
+    region: CaptureRegionDto,
+    remove_source: bool,
+    state: tauri::State<'_, AppState>,
+) -> Result<DbScreenshotEntry> {
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.crop(
+        &source_id,
+        CaptureRegion {
+            x: region.x,
+            y: region.y,
+            width: region.width,
+            height: region.height,
+        },
+        remove_source,
+    )
+}
+
+#[tauri::command]
 pub fn delete_screenshot(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
     let service = ScreenshotService::new(&state.pool, &state.paths);
     service.delete(&id)

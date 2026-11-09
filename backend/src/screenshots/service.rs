@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use chrono::Utc;
-use image::{DynamicImage, ImageFormat, RgbaImage};
+use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
 
 use crate::database::{DbPool, DbScreenshotEntry, ScreenshotRepo};
 use crate::errors::{AppError, Result};
@@ -40,12 +40,6 @@ impl CaptureMode {
         }
     }
 
-    pub fn region(&self) -> Option<CaptureRegion> {
-        match self {
-            CaptureMode::Fullscreen => None,
-            CaptureMode::Region(region) => Some(*region),
-        }
-    }
 }
 
 pub struct ScreenshotService<'a> {
@@ -84,7 +78,56 @@ impl<'a> ScreenshotService<'a> {
             region.height,
         )?;
 
-        self.store(image, mode.as_str(), mode.region())
+        self.store(image, mode.as_str(), Some(region))
+    }
+
+    /// Crop a stored screenshot, persist the selection as a region capture,
+    /// and optionally remove the source image used for selection.
+    pub fn crop(
+        &self,
+        source_id: &str,
+        region: CaptureRegion,
+        remove_source: bool,
+    ) -> Result<DbScreenshotEntry> {
+        let source = self
+            .repo
+            .find_by_id(source_id)?
+            .ok_or_else(|| AppError::NotFound(format!("Screenshot {source_id} not found")))?;
+
+        let dynamic = image::open(&source.original_path)?;
+        let (source_width, source_height) = dynamic.dimensions();
+        validate_crop_region(source_width, source_height, region)?;
+
+        let cropped = dynamic
+            .crop_imm(region.x as u32, region.y as u32, region.width, region.height)
+            .to_rgba8();
+
+        let absolute_region = CaptureRegion {
+            x: source.region_x.unwrap_or(0).saturating_add(region.x),
+            y: source.region_y.unwrap_or(0).saturating_add(region.y),
+            width: region.width,
+            height: region.height,
+        };
+
+        let entry = self.store(
+            CapturedImage {
+                width: region.width,
+                height: region.height,
+                rgba: cropped.into_raw(),
+            },
+            "region",
+            Some(absolute_region),
+        )?;
+
+        if remove_source {
+            if let Err(err) = self.delete(source_id) {
+                eprintln!(
+                    "[LucidClip Screenshots] Failed to remove crop source {source_id}: {err}"
+                );
+            }
+        }
+
+        Ok(entry)
     }
 
     /// Persist an already captured image, generate a thumbnail, and insert metadata.
@@ -202,6 +245,31 @@ fn remove_file_if_exists(path: &Path) {
             eprintln!("[LucidClip Screenshots] Failed to clean up image file: {err}");
         }
     }
+}
+
+fn validate_crop_region(source_width: u32, source_height: u32, region: CaptureRegion) -> Result<()> {
+    if region.width == 0 || region.height == 0 {
+        return Err(AppError::InvalidInput(
+            "Screenshot region must have a positive width and height".into(),
+        ));
+    }
+
+    if region.x < 0 || region.y < 0 {
+        return Err(AppError::InvalidInput(
+            "Screenshot region cannot start outside the image".into(),
+        ));
+    }
+
+    let right = region.x as u64 + region.width as u64;
+    let bottom = region.y as u64 + region.height as u64;
+
+    if right > source_width as u64 || bottom > source_height as u64 {
+        return Err(AppError::InvalidInput(
+            "Screenshot region extends past the source image".into(),
+        ));
+    }
+
+    Ok(())
 }
 
 pub fn validate_region(bounds: &ScreenBounds, region: CaptureRegion) -> Result<()> {
@@ -324,6 +392,49 @@ mod tests {
         assert!(!Path::new(&entry.original_path).exists());
         assert!(!Path::new(&entry.thumbnail_path).exists());
         assert!(service.list().unwrap().is_empty());
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn crop_persists_region_metadata_and_can_remove_the_source() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-crop-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ScreenshotService::new(&pool, &paths);
+
+        let source_region = CaptureRegion {
+            x: 100,
+            y: 200,
+            width: 64,
+            height: 48,
+        };
+        let source = service
+            .store(test_image(64, 48), "fullscreen", Some(source_region))
+            .unwrap();
+
+        let selection = CaptureRegion {
+            x: 8,
+            y: 4,
+            width: 20,
+            height: 16,
+        };
+        let cropped = service.crop(&source.id, selection, true).unwrap();
+
+        assert_eq!(cropped.width, 20);
+        assert_eq!(cropped.height, 16);
+        assert_eq!(cropped.capture_type, "region");
+        assert_eq!(cropped.region_x, Some(108));
+        assert_eq!(cropped.region_y, Some(204));
+        assert!(Path::new(&cropped.original_path).is_file());
+        assert!(service.get(&source.id).unwrap().is_none());
+        assert_eq!(service.list().unwrap().len(), 1);
 
         fs::remove_dir_all(&root).ok();
     }
