@@ -4,7 +4,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { IClipboardService } from '../contracts';
 import { ClipboardContentType, ClipboardEntry } from '@/types';
 
-interface DbClipboardDto {
+export interface DbClipboardDto {
   id: string;
   content: string;
   content_type: string;
@@ -21,7 +21,7 @@ interface DbClipboardDto {
   file_count?: number;
 }
 
-function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
+export function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
   const charCount = dto.content.length;
   const wordCount = dto.content.trim().split(/\s+/).filter(Boolean).length;
   const lineCount = dto.content.split('\n').length;

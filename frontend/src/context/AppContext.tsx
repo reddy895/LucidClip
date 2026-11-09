@@ -20,6 +20,10 @@ import {
   DEFAULT_SETTINGS,
 } from '@/services';
 import { listen } from '@tauri-apps/api/event';
+import {
+  DbClipboardDto,
+  mapDtoToEntry as mapClipboardDtoToEntry,
+} from '@/services/tauri/TauriClipboardService';
 import { useToast } from './ToastContext';
 
 interface AppContextValue {
@@ -142,8 +146,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unlisten: (() => void) | undefined;
     let cancelled = false;
 
-    listen('clipboard://new-entry', () => {
-      void refreshData();
+    listen<DbClipboardDto>('clipboard://new-entry', (event) => {
+      const entry = mapClipboardDtoToEntry(event.payload);
+      setClipboardItems((previous) => [
+        entry,
+        ...previous.filter((item) => item.id !== entry.id),
+      ]);
     })
       .then((dispose) => {
         if (cancelled) {
@@ -370,12 +378,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleMonitoring = async () => {
     const nextState = !settings.clipboard.monitoringEnabled;
-    const updated = await settingsService.updateSettings({
-      clipboard: { ...settings.clipboard, monitoringEnabled: nextState },
-      privacy: { ...settings.privacy, pauseMonitoring: !nextState },
-    });
-    setSettings(updated);
-    toast.info(nextState ? 'Monitoring active.' : 'Monitoring paused.');
+    try {
+      const updated = await settingsService.updateSettings({
+        clipboard: { ...settings.clipboard, monitoringEnabled: nextState },
+        privacy: { ...settings.privacy, pauseMonitoring: !nextState },
+      });
+      setSettings(updated);
+      toast.info(nextState ? 'Monitoring active.' : 'Monitoring paused.');
+    } catch (err) {
+      reportActionError('Monitoring update', err);
+    }
   };
 
   const unifiedHistory: HistoryItem[] = [
