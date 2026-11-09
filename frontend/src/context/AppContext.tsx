@@ -14,9 +14,11 @@ import {
   screenshotService,
   settingsService,
   storageService,
+  isTauri,
   StorageStats,
   DEFAULT_SETTINGS,
 } from '@/services';
+import { listen } from '@tauri-apps/api/event';
 import { useToast } from './ToastContext';
 
 interface AppContextValue {
@@ -111,6 +113,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     refreshData();
+  }, [refreshData]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    listen('clipboard://new-entry', () => {
+      void refreshData();
+    })
+      .then((dispose) => {
+        if (cancelled) {
+          dispose();
+        } else {
+          unlisten = dispose;
+        }
+      })
+      .catch((err) => {
+        console.error('[LucidClip] Failed to subscribe to clipboard events', err);
+      });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [refreshData]);
 
   const togglePreview = () => setIsPreviewVisible((prev) => !prev);
