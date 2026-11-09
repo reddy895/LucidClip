@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScreenshotEntry, HistoryItem } from '@/types';
 import { formatFullDateTime, formatRelativeTime, formatBytes } from '@/utils';
 import { Badge, Button, Tooltip, Dialog } from '@/components/ui';
-import { Copy, Pin, Star, Trash2, Download, Maximize2, FileText, Calendar } from 'lucide-react';
+import { Copy, Pin, Star, Trash2, Download, Maximize2, Calendar } from 'lucide-react';
 import { useApp } from '@/context';
 
 export interface ScreenshotPreviewProps {
@@ -12,27 +12,13 @@ export interface ScreenshotPreviewProps {
 export const ScreenshotPreview: React.FC<ScreenshotPreviewProps> = ({ screenshot }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
   const [isZoomOpen, setIsZoomOpen] = useState(false);
-  const [copiedOcr, setCopiedOcr] = useState(false);
 
   const asHistoryItem: HistoryItem = { kind: 'screenshot', ...screenshot };
-
-  const handleCopyOcr = async () => {
-    if (!screenshot.ocrText) return;
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(screenshot.ocrText);
-        setCopiedOcr(true);
-        setTimeout(() => setCopiedOcr(false), 2000);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleDownload = () => {
     const a = document.createElement('a');
     a.href = screenshot.fullImageUrl;
-    a.download = `LucidClip_${screenshot.id}_${Date.now()}.svg`;
+    a.download = `LucidClip_${screenshot.id}_${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -46,11 +32,6 @@ export const ScreenshotPreview: React.FC<ScreenshotPreviewProps> = ({ screenshot
           <Badge variant="default" size="sm" className="uppercase font-mono">
             {screenshot.captureType}
           </Badge>
-          {screenshot.ocrStatus === 'completed' && (
-            <Badge variant="accent" size="sm">
-              OCR Ready
-            </Badge>
-          )}
           {screenshot.isPinned && (
             <Badge variant="accent" size="sm" className="gap-1">
               <Pin className="h-2.5 w-2.5 fill-accent" />
@@ -121,28 +102,6 @@ export const ScreenshotPreview: React.FC<ScreenshotPreviewProps> = ({ screenshot
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
         </div>
-
-        {/* OCR Text Block */}
-        {screenshot.ocrText && (
-          <div className="flex flex-col gap-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-graphite-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="h-3 w-3 text-accent" />
-                OCR Extracted Text
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyOcr}
-                className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium"
-              >
-                {copiedOcr ? 'Copied!' : 'Copy Text'}
-              </button>
-            </div>
-            <div className="rounded-btn bg-[#151719] border border-graphite-border p-2.5 font-mono text-[11px] leading-relaxed text-[#F3F4F6] max-h-36 overflow-y-auto whitespace-pre-wrap select-text">
-              {screenshot.ocrText}
-            </div>
-          </div>
-        )}
 
         {/* Metadata Details */}
         <div className="pt-2 border-t border-graphite-border-subtle flex flex-col gap-2">

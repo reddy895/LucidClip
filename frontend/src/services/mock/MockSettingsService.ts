@@ -21,9 +21,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     excludedApps: ['1Password.exe', 'KeePass.exe', 'Bitwarden.exe', 'KeePassXC.exe'],
   },
   screenshots: {
-    saveDirectory: 'C:\\Users\\User\\Pictures\\LucidClip',
+    saveDirectory: '',
     retentionDays: 60,
-    enableOcr: true,
+    enableOcr: false,
     ocrLanguage: 'en-US',
     thumbnailQuality: 'high',
   },

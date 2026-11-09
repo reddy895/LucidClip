@@ -22,9 +22,7 @@ export const ScreenshotsView: React.FC = () => {
     return screenshotItems.filter((shot) => {
       if (filterType !== 'all' && shot.captureType !== filterType) return false;
       if (q) {
-        const matchOcr = shot.ocrText?.toLowerCase().includes(q) ?? false;
-        const matchType = shot.captureType.toLowerCase().includes(q);
-        return matchOcr || matchType;
+        return shot.captureType.toLowerCase().includes(q);
       }
       return true;
     });
@@ -54,7 +52,7 @@ export const ScreenshotsView: React.FC = () => {
       {/* Page Header */}
       <SectionHeader
         title="Screenshots"
-        description="Captured desktop snapshots and OCR-extracted text archives."
+        description="Desktop snapshots stored locally on this device."
         badge={
           <Badge variant="default" size="sm" className="font-mono">
             {filtered.length}
@@ -91,7 +89,7 @@ export const ScreenshotsView: React.FC = () => {
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Search OCR extracted text, keywords, types..."
+            placeholder="Filter by capture type..."
             shortcutBadge="/"
           />
         </div>

@@ -23,7 +23,7 @@ export const ScreenshotActionsModal: React.FC<ScreenshotActionsModalProps> = ({
   const handleExport = () => {
     const a = document.createElement('a');
     a.href = screenshot.fullImageUrl;
-    a.download = `LucidClip_${screenshot.id}_${Date.now()}.svg`;
+    a.download = `LucidClip_${screenshot.id}_${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -87,7 +87,7 @@ export const ScreenshotActionsModal: React.FC<ScreenshotActionsModalProps> = ({
         onClose={() => setIsConfirmDeleteOpen(false)}
         onConfirm={handleDelete}
         title="Delete Screenshot"
-        description="Are you sure you want to delete this screenshot? Extracted OCR text will also be permanently removed."
+        description="Are you sure you want to delete this screenshot? Its image files will also be permanently removed."
         confirmText="Delete"
         isDestructive={true}
       />

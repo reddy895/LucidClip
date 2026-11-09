@@ -360,69 +360,18 @@ export const SettingsView: React.FC = () => {
           {activeTab === 'screenshots' && (
             <div className="flex flex-col">
               <SettingsSection
-                title="Screenshot Storage & OCR"
-                description="Configure local screenshot file storage and offline OCR extraction."
+                title="Screenshot Storage"
+                description="Captured images are stored inside the LucidClip application data folder."
               >
-                <div className="flex flex-col gap-1 py-1">
-                  <div className="text-xs font-medium text-graphite-text-primary">
-                    Default Save Directory
-                  </div>
-                  <div className="text-[11px] text-graphite-text-muted mb-1.5">
-                    Local folder where screenshot image files are saved.
-                  </div>
-                  <Input
-                    value={settings.screenshots.saveDirectory}
-                    onChange={(e) =>
-                      updateSettings({
-                        screenshots: { ...settings.screenshots, saveDirectory: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Local OCR text extraction
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Extract text from captured screenshots completely offline.
-                    </div>
-                  </div>
-                  <Toggle
-                    checked={settings.screenshots.enableOcr}
-                    onChange={(checked) =>
-                      updateSettings({
-                        screenshots: { ...settings.screenshots, enableOcr: checked },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      OCR Language Model
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Language model used for offline text recognition.
-                    </div>
-                  </div>
-                  <Select
-                    value={settings.screenshots.ocrLanguage}
-                    onChange={(val) =>
-                      updateSettings({
-                        screenshots: { ...settings.screenshots, ocrLanguage: val },
-                      })
-                    }
-                    options={[
-                      { value: 'en-US', label: 'English (US)' },
-                      { value: 'en-GB', label: 'English (UK)' },
-                      { value: 'de-DE', label: 'German' },
-                      { value: 'fr-FR', label: 'French' },
-                    ]}
-                    className="w-36"
-                  />
+                <div className="rounded-btn border border-graphite-border bg-graphite-surface p-3 text-xs text-graphite-text-secondary">
+                  <p className="font-medium text-graphite-text-primary mb-1">
+                    Local image storage
+                  </p>
+                  <p className="text-graphite-text-muted leading-relaxed">
+                    Originals and thumbnails are written to the app data directory and served
+                    through Tauri's scoped asset protocol. Screenshot text extraction is not
+                    available in this build, so captures are stored as images only.
+                  </p>
                 </div>
               </SettingsSection>
             </div>
@@ -432,49 +381,30 @@ export const SettingsView: React.FC = () => {
             <div className="flex flex-col">
               <SettingsSection
                 title="Keyboard Shortcuts"
-                description="Global and local hotkeys for instant desktop productivity."
+                description="Shortcuts are active while the LucidClip window is focused."
               >
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Quick Access Launcher
+                {[
+                  { label: 'Quick Access Launcher', description: 'Open or close the search overlay.', keys: settings.shortcuts.quickAccess },
+                  { label: 'Focus Search', description: 'Move focus to the current view search field.', keys: 'Ctrl+F or /' },
+                  { label: 'Toggle Sidebar', description: 'Collapse or expand the navigation sidebar.', keys: 'Ctrl+B' },
+                  { label: 'Toggle Preview Panel', description: 'Show or hide the item preview panel.', keys: 'Ctrl+P' },
+                  { label: 'Open Settings', description: 'Switch directly to the settings view.', keys: 'Ctrl+,' },
+                  { label: 'Navigate Views', description: 'Jump between the five main sections.', keys: 'Ctrl+1 to Ctrl+5' },
+                ].map((shortcut) => (
+                  <div key={shortcut.label} className="flex items-center justify-between py-1">
+                    <div>
+                      <div className="text-xs font-medium text-graphite-text-primary">
+                        {shortcut.label}
+                      </div>
+                      <div className="text-[11px] text-graphite-text-muted">
+                        {shortcut.description}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Opens the centered quick search and clipboard retrieval window.
-                    </div>
+                    <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-graphite-text-primary border border-graphite-border">
+                      {shortcut.keys}
+                    </kbd>
                   </div>
-                  <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-graphite-text-primary border border-graphite-border">
-                    {settings.shortcuts.quickAccess}
-                  </kbd>
-                </div>
-
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Capture Full Screen
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Instantly snapshot the entire active monitor and process OCR.
-                    </div>
-                  </div>
-                  <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-graphite-text-primary border border-graphite-border">
-                    {settings.shortcuts.captureFullscreen}
-                  </kbd>
-                </div>
-
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
-                      Capture Selected Region
-                    </div>
-                    <div className="text-[11px] text-graphite-text-muted">
-                      Select a bounding box area on screen to capture.
-                    </div>
-                  </div>
-                  <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-graphite-text-primary border border-graphite-border">
-                    {settings.shortcuts.captureRegion}
-                  </kbd>
-                </div>
+                ))}
               </SettingsSection>
             </div>
           )}
