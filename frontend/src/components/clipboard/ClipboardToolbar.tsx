@@ -3,13 +3,11 @@ import { Button, Dialog, Input } from '@/components/ui';
 import { Plus, Download } from 'lucide-react';
 import { clipboardService } from '@/services';
 import { useApp } from '@/context';
+import { useToast } from '@/context/ToastContext';
 
-export interface ClipboardToolbarProps {
-  onRefresh: () => void;
-}
-
-export const ClipboardToolbar: React.FC<ClipboardToolbarProps> = ({ onRefresh }) => {
+export const ClipboardToolbar: React.FC = () => {
   const { refreshData } = useApp();
+  const toast = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newText, setNewText] = useState('');
   const [newApp, setNewApp] = useState('Manual');
@@ -24,9 +22,10 @@ export const ClipboardToolbar: React.FC<ClipboardToolbarProps> = ({ onRefresh })
       setNewApp('Manual');
       setIsAddModalOpen(false);
       await refreshData();
-      onRefresh();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      toast.error(
+        `Failed to save snippet: ${err instanceof Error ? err.message : String(err)}`
+      );
     } finally {
       setIsSubmitting(false);
     }

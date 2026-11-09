@@ -75,7 +75,7 @@ export const ClipboardView: React.FC = () => {
         }
         actions={
           <div className="flex items-center gap-2">
-            <ClipboardToolbar onRefresh={() => {}} />
+            <ClipboardToolbar />
             <div className="h-4 w-[1px] bg-graphite-border mx-0.5" />
             <SortDropdown
               sortOrder={sortOrder}

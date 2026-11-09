@@ -5,9 +5,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Command,
-  Minus,
-  Square,
-  X,
   ShieldCheck,
   ShieldAlert,
 } from 'lucide-react';
@@ -88,7 +85,7 @@ export const AppHeader: React.FC = () => {
               <>
                 <ShieldCheck className="h-3.5 w-3.5 text-status-success" />
                 <span className="hidden md:inline text-graphite-text-secondary">Monitoring</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-status-success animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
               </>
             ) : (
               <>
@@ -118,30 +115,6 @@ export const AppHeader: React.FC = () => {
           </button>
         </Tooltip>
 
-        {/* Simulated desktop window controls */}
-        <div className="hidden lg:flex items-center ml-2 border-l border-graphite-border pl-1.5">
-          <button
-            type="button"
-            aria-label="Minimize"
-            className="flex h-7 w-7 items-center justify-center rounded-btn text-graphite-text-muted hover:text-graphite-text-primary hover:bg-graphite-hover transition-colors"
-          >
-            <Minus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Maximize"
-            className="flex h-7 w-7 items-center justify-center rounded-btn text-graphite-text-muted hover:text-graphite-text-primary hover:bg-graphite-hover transition-colors"
-          >
-            <Square className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            aria-label="Close"
-            className="flex h-7 w-7 items-center justify-center rounded-btn text-graphite-text-muted hover:text-status-error hover:bg-status-error-bg transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
       </div>
     </header>
   );
