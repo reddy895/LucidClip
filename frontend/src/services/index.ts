@@ -5,7 +5,6 @@ export * from './tauri';
 import {
   MockClipboardService,
   MockScreenshotService,
-  MockSearchService,
   MockSettingsService,
   storageService as mockStorageService,
 } from './mock';
@@ -15,6 +14,7 @@ import {
   TauriSettingsService,
   TauriStorageService,
 } from './tauri';
+import { HistorySearchService } from './search/HistorySearchService';
 
 // Detect whether running in desktop Tauri webview or standard browser
 export const isTauri = (): boolean => {
@@ -40,4 +40,7 @@ export const storageService = isTauri()
   ? new TauriStorageService()
   : mockStorageService;
 
-export const searchService = new MockSearchService();
+export const searchService = new HistorySearchService(
+  clipboardService,
+  screenshotService
+);
