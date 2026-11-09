@@ -19,6 +19,10 @@ const MAX_IMAGE_BYTES: usize = 128 * 1024 * 1024;
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const MAX_FILE_COUNT: usize = 10_000;
 
+/// Maximum text or file-list bytes read from another process.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+const MAX_TEXT_BYTES: usize = 8 * 1024 * 1024;
+
 #[cfg(target_os = "windows")]
 mod windows_clipboard {
     use std::ptr;
@@ -35,7 +39,7 @@ mod windows_clipboard {
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
 
-    use super::{build_dropfiles, parse_dib, parse_file_list, ClipboardSnapshot};
+    use super::{build_dropfiles, parse_dib, parse_file_list, ClipboardSnapshot, MAX_TEXT_BYTES};
     use crate::errors::{AppError, Result};
     use crate::platform::CapturedImage;
 
@@ -394,6 +398,14 @@ mod windows_clipboard {
         }
 
         let byte_len = unsafe { GlobalSize(handle) };
+        if byte_len as usize > MAX_TEXT_BYTES {
+            unsafe {
+                GlobalUnlock(handle);
+            }
+            return Err(AppError::Clipboard(
+                "Windows clipboard text is larger than the supported limit".into(),
+            ));
+        }
         let unit_count = byte_len / std::mem::size_of::<u16>();
         let mut utf16 = Vec::with_capacity(unit_count.min(1_048_576));
 
@@ -429,6 +441,14 @@ mod windows_clipboard {
         }
 
         let byte_len = unsafe { GlobalSize(handle) } as usize;
+        if byte_len > MAX_TEXT_BYTES {
+            unsafe {
+                GlobalUnlock(handle);
+            }
+            return Err(AppError::Clipboard(
+                "Windows clipboard text is larger than the supported limit".into(),
+            ));
+        }
         let bytes = unsafe { std::slice::from_raw_parts(source, byte_len) };
         let end = bytes.iter().position(|byte| *byte == 0).unwrap_or(byte_len);
         let ansi = bytes[..end].to_vec();
@@ -477,6 +497,14 @@ mod windows_clipboard {
         }
 
         let byte_len = unsafe { GlobalSize(handle) } as usize;
+        if byte_len > MAX_TEXT_BYTES {
+            unsafe {
+                GlobalUnlock(handle);
+            }
+            return Err(AppError::Clipboard(
+                "Windows clipboard file list is larger than the supported limit".into(),
+            ));
+        }
         let data = unsafe { std::slice::from_raw_parts(source, byte_len) };
         let result = parse_file_list(data);
         unsafe {
