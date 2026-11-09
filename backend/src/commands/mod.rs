@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::fs;
 use serde::{Deserialize, Serialize};
 use crate::clipboard::ClipboardService;
-use crate::database::{DbClipboardEntry, DbScreenshotEntry, ScreenshotRepo, SettingsRepo};
-use crate::errors::Result;
+use crate::database::{DbClipboardEntry, DbScreenshotEntry, SettingsRepo};
+use crate::errors::{AppError, Result};
+use crate::screenshots::{CaptureMode, CaptureRegion, ScreenshotService};
 use crate::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,32 +70,68 @@ pub fn clear_clipboard_history(state: tauri::State<'_, AppState>) -> Result<usiz
 // Screenshot Commands
 // ==========================================
 
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct CaptureRegionDto {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[tauri::command]
 pub fn get_screenshots(state: tauri::State<'_, AppState>) -> Result<Vec<DbScreenshotEntry>> {
-    let repo = ScreenshotRepo::new(&state.pool);
-    repo.list_all()
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.list()
+}
+
+#[tauri::command]
+pub fn capture_screenshot(
+    capture_type: String,
+    region: Option<CaptureRegionDto>,
+    state: tauri::State<'_, AppState>,
+) -> Result<DbScreenshotEntry> {
+    let mode = match capture_type.as_str() {
+        "fullscreen" => CaptureMode::Fullscreen,
+        "region" => {
+            let region = region.ok_or_else(|| {
+                AppError::InvalidInput(
+                    "A capture region is required for region screenshots".into(),
+                )
+            })?;
+            CaptureMode::Region(CaptureRegion {
+                x: region.x,
+                y: region.y,
+                width: region.width,
+                height: region.height,
+            })
+        }
+        other => {
+            return Err(AppError::InvalidInput(format!(
+                "Unsupported capture type: {other}"
+            )))
+        }
+    };
+
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.capture(mode)
 }
 
 #[tauri::command]
 pub fn delete_screenshot(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let repo = ScreenshotRepo::new(&state.pool);
-    if let Some(entry) = repo.find_by_id(&id)? {
-        let _ = fs::remove_file(&entry.original_path);
-        let _ = fs::remove_file(&entry.thumbnail_path);
-    }
-    repo.delete(&id)
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.delete(&id)
 }
 
 #[tauri::command]
 pub fn toggle_screenshot_pin(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let repo = ScreenshotRepo::new(&state.pool);
-    repo.toggle_pin(&id)
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.toggle_pin(&id)
 }
 
 #[tauri::command]
 pub fn toggle_screenshot_favorite(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let repo = ScreenshotRepo::new(&state.pool);
-    repo.toggle_favorite(&id)
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.toggle_favorite(&id)
 }
 
 // ==========================================
