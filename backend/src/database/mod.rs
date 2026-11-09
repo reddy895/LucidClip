@@ -35,6 +35,12 @@ mod tests {
             content_hash: "hash-1".to_string(),
             pinned: false,
             favorite: false,
+            image_path: None,
+            thumbnail_path: None,
+            image_width: None,
+            image_height: None,
+            byte_size: 15,
+            file_count: 0,
         };
         clipboard_repo.insert(&entry).expect("failed to insert");
         assert_eq!(clipboard_repo.count().unwrap(), 1);

@@ -71,6 +71,16 @@ pub const MIGRATIONS: &[Migration] = &[
               ALTER TABLE screenshots ADD COLUMN region_width INTEGER;
               ALTER TABLE screenshots ADD COLUMN region_height INTEGER;",
     },
+    Migration {
+        version: 6,
+        description: "store clipboard image and file metadata",
+        sql: "ALTER TABLE clipboard_entries ADD COLUMN image_path TEXT;
+              ALTER TABLE clipboard_entries ADD COLUMN thumbnail_path TEXT;
+              ALTER TABLE clipboard_entries ADD COLUMN image_width INTEGER;
+              ALTER TABLE clipboard_entries ADD COLUMN image_height INTEGER;
+              ALTER TABLE clipboard_entries ADD COLUMN byte_size INTEGER NOT NULL DEFAULT 0;
+              ALTER TABLE clipboard_entries ADD COLUMN file_count INTEGER NOT NULL DEFAULT 0;",
+    },
 ];
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {

@@ -52,6 +52,12 @@ impl<'a> ClipboardService<'a> {
             content_hash,
             pinned: false,
             favorite: false,
+            image_path: None,
+            thumbnail_path: None,
+            image_width: None,
+            image_height: None,
+            byte_size: raw_text.len() as u64,
+            file_count: 0,
         };
 
         self.repo.insert(&new_entry)?;
@@ -179,6 +185,12 @@ mod tests {
             content_hash: "old-hash".into(),
             pinned: false,
             favorite: false,
+            image_path: None,
+            thumbnail_path: None,
+            image_width: None,
+            image_height: None,
+            byte_size: 3,
+            file_count: 0,
         })
         .unwrap();
 

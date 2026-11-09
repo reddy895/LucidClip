@@ -15,6 +15,33 @@ pub struct DbClipboardEntry {
     pub content_hash: String,
     pub pinned: bool,
     pub favorite: bool,
+    pub image_path: Option<String>,
+    pub thumbnail_path: Option<String>,
+    pub image_width: Option<u32>,
+    pub image_height: Option<u32>,
+    pub byte_size: u64,
+    pub file_count: u32,
+}
+
+const ENTRY_COLUMNS: &str = "id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count";
+
+fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<DbClipboardEntry> {
+    Ok(DbClipboardEntry {
+        id: row.get(0)?,
+        content: row.get(1)?,
+        content_type: row.get(2)?,
+        source_app: row.get(3)?,
+        created_at: row.get(4)?,
+        content_hash: row.get(5)?,
+        pinned: row.get::<_, i64>(6)? != 0,
+        favorite: row.get::<_, i64>(7)? != 0,
+        image_path: row.get(8)?,
+        thumbnail_path: row.get(9)?,
+        image_width: row.get(10)?,
+        image_height: row.get(11)?,
+        byte_size: row.get::<_, i64>(12)? as u64,
+        file_count: row.get::<_, i64>(13)? as u32,
+    })
 }
 
 pub struct ClipboardRepo<'a> {
@@ -29,8 +56,8 @@ impl<'a> ClipboardRepo<'a> {
     pub fn insert(&self, entry: &DbClipboardEntry) -> Result<()> {
         self.pool.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO clipboard_entries (id, content, content_type, source_app, created_at, content_hash, pinned, favorite)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO clipboard_entries (id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 params![
                     entry.id,
                     entry.content,
@@ -40,6 +67,12 @@ impl<'a> ClipboardRepo<'a> {
                     entry.content_hash,
                     if entry.pinned { 1 } else { 0 },
                     if entry.favorite { 1 } else { 0 },
+                    entry.image_path,
+                    entry.thumbnail_path,
+                    entry.image_width,
+                    entry.image_height,
+                    entry.byte_size as i64,
+                    entry.file_count as i64,
                 ],
             )?;
             Ok(())
@@ -48,23 +81,13 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn find_by_hash(&self, hash: &str) -> Result<Option<DbClipboardEntry>> {
         self.pool.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "SELECT id, content, content_type, source_app, created_at, content_hash, pinned, favorite
-                 FROM clipboard_entries WHERE content_hash = ?1",
-            )?;
+            let mut stmt = conn.prepare(&format!(
+                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE content_hash = ?1"
+            ))?;
             let mut rows = stmt.query([hash])?;
 
             if let Some(row) = rows.next()? {
-                Ok(Some(DbClipboardEntry {
-                    id: row.get(0)?,
-                    content: row.get(1)?,
-                    content_type: row.get(2)?,
-                    source_app: row.get(3)?,
-                    created_at: row.get(4)?,
-                    content_hash: row.get(5)?,
-                    pinned: row.get::<_, i64>(6)? != 0,
-                    favorite: row.get::<_, i64>(7)? != 0,
-                }))
+                Ok(Some(row_to_entry(row)?))
             } else {
                 Ok(None)
             }
@@ -73,23 +96,13 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn find_by_id(&self, id: &str) -> Result<Option<DbClipboardEntry>> {
         self.pool.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "SELECT id, content, content_type, source_app, created_at, content_hash, pinned, favorite
-                 FROM clipboard_entries WHERE id = ?1",
-            )?;
+            let mut stmt = conn.prepare(&format!(
+                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE id = ?1"
+            ))?;
             let mut rows = stmt.query([id])?;
 
             if let Some(row) = rows.next()? {
-                Ok(Some(DbClipboardEntry {
-                    id: row.get(0)?,
-                    content: row.get(1)?,
-                    content_type: row.get(2)?,
-                    source_app: row.get(3)?,
-                    created_at: row.get(4)?,
-                    content_hash: row.get(5)?,
-                    pinned: row.get::<_, i64>(6)? != 0,
-                    favorite: row.get::<_, i64>(7)? != 0,
-                }))
+                Ok(Some(row_to_entry(row)?))
             } else {
                 Ok(None)
             }
@@ -108,24 +121,12 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn list_all(&self) -> Result<Vec<DbClipboardEntry>> {
         self.pool.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "SELECT id, content, content_type, source_app, created_at, content_hash, pinned, favorite
-                 FROM clipboard_entries ORDER BY created_at DESC",
-            )?;
+            let mut stmt = conn.prepare(&format!(
+                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries ORDER BY created_at DESC"
+            ))?;
 
             let entries = stmt
-                .query_map([], |row| {
-                    Ok(DbClipboardEntry {
-                        id: row.get(0)?,
-                        content: row.get(1)?,
-                        content_type: row.get(2)?,
-                        source_app: row.get(3)?,
-                        created_at: row.get(4)?,
-                        content_hash: row.get(5)?,
-                        pinned: row.get::<_, i64>(6)? != 0,
-                        favorite: row.get::<_, i64>(7)? != 0,
-                    })
-                })?
+                .query_map([], row_to_entry)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
 
             Ok(entries)
