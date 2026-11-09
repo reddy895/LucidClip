@@ -14,6 +14,6 @@ export interface IScreenshotService {
   toggleFavorite(id: string): Promise<ScreenshotEntry>;
   deleteScreenshot(id: string): Promise<boolean>;
   copyImageToClipboard(id: string): Promise<boolean>;
-  exportScreenshot(id: string, destinationPath?: string): Promise<boolean>;
+  exportScreenshot(id: string): Promise<string>;
 }
 

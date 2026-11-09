@@ -10,18 +10,13 @@ export interface ScreenshotPreviewProps {
 }
 
 export const ScreenshotPreview: React.FC<ScreenshotPreviewProps> = ({ screenshot }) => {
-  const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
+  const { copyItem, togglePin, toggleFavorite, deleteItem, exportScreenshot } = useApp();
   const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   const asHistoryItem: HistoryItem = { kind: 'screenshot', ...screenshot };
 
   const handleDownload = () => {
-    const a = document.createElement('a');
-    a.href = screenshot.fullImageUrl;
-    a.download = `LucidClip_${screenshot.id}_${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    void exportScreenshot(screenshot.id);
   };
 
   return (

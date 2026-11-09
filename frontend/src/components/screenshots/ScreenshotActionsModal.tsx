@@ -15,19 +15,14 @@ export const ScreenshotActionsModal: React.FC<ScreenshotActionsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { copyItem, deleteItem } = useApp();
+  const { copyItem, deleteItem, exportScreenshot } = useApp();
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = React.useState(false);
 
   if (!screenshot) return null;
 
-  const handleExport = () => {
-    const a = document.createElement('a');
-    a.href = screenshot.fullImageUrl;
-    a.download = `LucidClip_${screenshot.id}_${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    onClose();
+  const handleExport = async () => {
+    const destination = await exportScreenshot(screenshot.id);
+    if (destination) onClose();
   };
 
   const handleCopy = async () => {

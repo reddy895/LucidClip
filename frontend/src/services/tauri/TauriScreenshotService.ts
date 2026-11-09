@@ -102,8 +102,7 @@ export class TauriScreenshotService implements IScreenshotService {
   }
 
   async copyImageToClipboard(id: string): Promise<boolean> {
-    const entry = await this.getScreenshotById(id);
-    return !!entry;
+    return await invoke<boolean>('copy_screenshot_image', { id });
   }
 
   async togglePin(id: string): Promise<ScreenshotEntry> {
@@ -129,8 +128,7 @@ export class TauriScreenshotService implements IScreenshotService {
     }
   }
 
-  async exportScreenshot(id: string, _targetPath: string): Promise<boolean> {
-    const entry = await this.getScreenshotById(id);
-    return !!entry;
+  async exportScreenshot(id: string): Promise<string> {
+    return await invoke<string>('export_screenshot', { id });
   }
 }

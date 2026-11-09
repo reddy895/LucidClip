@@ -110,11 +110,11 @@ export class MockScreenshotService implements IScreenshotService {
   }
 
   async copyImageToClipboard(_id: string): Promise<boolean> {
-    return Promise.resolve(false);
+    throw new Error('Copying screenshot images requires the LucidClip desktop application.');
   }
 
-  async exportScreenshot(_id: string, _destinationPath?: string): Promise<boolean> {
-    return Promise.resolve(false);
+  async exportScreenshot(_id: string): Promise<string> {
+    throw new Error('Exporting screenshots requires the LucidClip desktop application.');
   }
 }
 

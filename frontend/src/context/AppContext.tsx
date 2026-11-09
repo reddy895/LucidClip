@@ -65,6 +65,7 @@ interface AppContextValue {
   deleteItem: (item: HistoryItem) => Promise<boolean>;
   clearClipboardHistory: () => Promise<void>;
   captureScreenshot: (type: CaptureType) => Promise<void>;
+  exportScreenshot: (id: string) => Promise<string | null>;
   regionCaptureSource: ScreenshotEntry | null;
   cancelRegionCapture: () => Promise<void>;
   confirmRegionCapture: (region: ScreenshotRegion) => Promise<void>;
@@ -294,6 +295,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const exportScreenshot = async (id: string): Promise<string | null> => {
+    try {
+      const destination = await screenshotService.exportScreenshot(id);
+      toast.success(`Screenshot exported to ${destination}`);
+      return destination;
+    } catch (err) {
+      reportActionError('Export screenshot', err);
+      return null;
+    }
+  };
+
   const cancelRegionCapture = async () => {
     const source = regionCaptureSource;
     setRegionCaptureSource(null);
@@ -396,6 +408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteItem,
         clearClipboardHistory,
         captureScreenshot,
+        exportScreenshot,
         regionCaptureSource,
         cancelRegionCapture,
         confirmRegionCapture,
