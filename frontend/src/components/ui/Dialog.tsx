@@ -52,7 +52,7 @@ export const Dialog: React.FC<DialogProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-micro"
+        className="fixed inset-0 bg-black/60 transition-opacity duration-micro"
         onClick={onClose}
         aria-hidden="true"
       />

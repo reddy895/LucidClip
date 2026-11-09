@@ -89,7 +89,7 @@ export const QuickAccessOverlay: React.FC = () => {
       onClick={closeQuickAccess}
     >
       {/* Subtle backdrop */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity" />
+      <div className="fixed inset-0 bg-black/60 transition-opacity" />
 
       {/* Floating launcher window */}
       <div

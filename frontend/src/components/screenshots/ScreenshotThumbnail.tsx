@@ -38,22 +38,13 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
         <img
           src={screenshot.thumbnailUrl}
           alt={`Screenshot from ${screenshot.createdAt}`}
-          className="h-full w-full object-cover transition-transform duration-panel group-hover:scale-[1.02]"
+          className="h-full w-full object-cover"
           loading="lazy"
         />
 
-        {/* OCR badge top right */}
-        {screenshot.ocrStatus === 'completed' && (
-          <div className="absolute top-2 right-2">
-            <Badge variant="accent" size="sm" className="bg-[#151719]/80 backdrop-blur-sm shadow-sm font-mono text-[9.5px]">
-              OCR
-            </Badge>
-          </div>
-        )}
-
         {/* Capture type top left */}
         <div className="absolute top-2 left-2">
-          <Badge variant="default" size="sm" className="bg-[#151719]/80 backdrop-blur-sm text-[9.5px] uppercase">
+          <Badge variant="default" size="sm" className="bg-[#151719]/80 text-[9.5px] uppercase">
             {screenshot.captureType}
           </Badge>
         </div>
