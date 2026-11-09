@@ -12,6 +12,7 @@
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm --prefix frontend run build",
     "typecheck": "npm --prefix frontend run typecheck",
+    "check:layout": "node ./scripts/check-layout.mjs",
     "test": "node --test scripts/test-runner.mjs"
   },
   "devDependencies": {

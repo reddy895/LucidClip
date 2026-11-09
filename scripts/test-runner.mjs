@@ -9,6 +9,7 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { validateProjectLayout } from './check-layout.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,11 @@ const rootDir = path.resolve(__dirname, '..');
 const backendDir = path.resolve(rootDir, 'backend');
 
 describe('LucidClip Core Integrity Verification', () => {
+
+  test('Project layout and launcher contracts are valid', () => {
+    const errors = validateProjectLayout(rootDir);
+    assert.deepEqual(errors, [], `Layout validation failed:\n${errors.join('\n')}`);
+  });
 
   test('Zero-Mock Policy: fresh services initialize with zero entries', () => {
     // Read the mock services to verify no fixtures are loaded into default state
