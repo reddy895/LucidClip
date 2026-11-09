@@ -5,6 +5,7 @@
 //! Clipboard contents are never logged.
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -19,8 +20,16 @@ use crate::platform;
 /// Event emitted whenever the monitor persists a new clipboard entry.
 pub const CLIPBOARD_CAPTURED_EVENT: &str = "clipboard://new-entry";
 
-/// Sampling interval for clipboard changes.
+/// Fallback sampling interval when native change notifications are unavailable.
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Native notifications can arrive before the source application has finished
+/// writing all formats. Wait briefly, then coalesce the burst.
+const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
+
+/// Even with native notifications, run a slow safety pass to recover from
+/// dropped or missed messages without polling aggressively.
+const SAFETY_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Guard against pathological clipboard payloads freezing the UI or database.
 const MAX_CAPTURE_CHARS: usize = 1_000_000;
@@ -86,7 +95,7 @@ fn monitor_policy(pool: &DbPool) -> MonitorPolicy {
     let exclude_sensitive = value
         .pointer("/privacy/excludePasswordManagers")
         .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false);
+        .unwrap_or(true);
 
     MonitorPolicy {
         enabled: clipboard_enabled && !paused,
@@ -114,6 +123,139 @@ fn is_excluded_process(policy: &MonitorPolicy, process: Option<&str>) -> bool {
 /// Start the clipboard monitor thread.
 ///
 /// The thread exits when `stop` is set to `true` during application shutdown.
+struct CaptureState {
+    last_hash: Option<String>,
+}
+
+fn capture_text_once(
+    app: &AppHandle,
+    pool: &DbPool,
+    policy: &MonitorPolicy,
+    state: &mut CaptureState,
+) {
+    let foreground = match platform::foreground_process_name() {
+        Ok(name) => name,
+        Err(err) => {
+            eprintln!("[LucidClip Monitor] Could not resolve source app: {err}");
+            None
+        }
+    };
+
+    if is_excluded_process(policy, foreground.as_deref()) {
+        return;
+    }
+
+    if policy.exclude_sensitive {
+        match platform::clipboard_content_is_sensitive() {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(err) => {
+                eprintln!(
+                    "[LucidClip Monitor] Sensitive-content check failed; skipping tick: {err}"
+                );
+                return;
+            }
+        }
+    }
+
+    match platform::read_clipboard_text() {
+        Ok(Some(text)) if !text.trim().is_empty() => {
+            if text.chars().count() > MAX_CAPTURE_CHARS {
+                eprintln!(
+                    "[LucidClip Monitor] Skipped clipboard content larger than {MAX_CAPTURE_CHARS} characters."
+                );
+                return;
+            }
+
+            let hash = hash_content(&text);
+            if state.last_hash.as_deref() == Some(hash.as_str()) {
+                return;
+            }
+
+            let service = ClipboardService::new(pool);
+            match service.process_copied_text(&text, foreground) {
+                Ok(entry) => {
+                    state.last_hash = Some(hash);
+                    if let Err(err) = app.emit(CLIPBOARD_CAPTURED_EVENT, &entry) {
+                        eprintln!("[LucidClip Monitor] Failed to notify frontend: {err}");
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[LucidClip Monitor] Failed to persist clipboard entry: {err}");
+                }
+            }
+        }
+        Ok(_) => {
+            // The clipboard no longer holds text. Clear the fingerprint so the
+            // same text is captured again after an image or file copy.
+            state.last_hash = None;
+        }
+        Err(err) => {
+            // Clipboard contention is expected; retry on the next tick.
+            eprintln!("[LucidClip Monitor] Clipboard read skipped: {err}");
+        }
+    }
+}
+
+fn run_monitor(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
+    println!("[LucidClip Monitor] Clipboard monitor started.");
+    let mut state = CaptureState { last_hash: None };
+
+    #[cfg(target_os = "windows")]
+    let native_notifications = {
+        let (notify_tx, notify_rx) = mpsc::sync_channel::<()>(1);
+        match platform::spawn_clipboard_watcher(notify_tx, stop.clone()) {
+            Ok(()) => Some(notify_rx),
+            Err(err) => {
+                eprintln!(
+                    "[LucidClip Monitor] Native notifications unavailable ({err}); using polling fallback."
+                );
+                None
+            }
+        }
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let native_notifications: Option<mpsc::Receiver<()>> = None;
+
+    // Capture the current clipboard once at startup.
+    let policy = monitor_policy(&pool);
+    if policy.enabled {
+        capture_text_once(&app, &pool, &policy, &mut state);
+    }
+
+    while !stop.load(Ordering::Relaxed) {
+        let wait_result = match &native_notifications {
+            Some(receiver) => receiver.recv_timeout(SAFETY_POLL_INTERVAL),
+            None => {
+                thread::sleep(POLL_INTERVAL);
+                Err(RecvTimeoutError::Timeout)
+            }
+        };
+
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+
+        if matches!(wait_result, Ok(())) {
+            // Let the source application finish publishing every format, then
+            // drain any queued notifications into this single capture.
+            thread::sleep(DEBOUNCE_INTERVAL);
+            while native_notifications
+                .as_ref()
+                .is_some_and(|receiver| receiver.try_recv().is_ok())
+            {}
+        }
+
+        let policy = monitor_policy(&pool);
+        if policy.enabled {
+            capture_text_once(&app, &pool, &policy, &mut state);
+        }
+    }
+
+    println!("[LucidClip Monitor] Clipboard monitor stopped.");
+}
+
 pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
     if !platform::clipboard_monitoring_supported() {
         println!("[LucidClip Monitor] Native clipboard monitoring is unavailable on this host.");
@@ -122,86 +264,7 @@ pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
 
     let spawned = thread::Builder::new()
         .name("lucidclip-clipboard-monitor".into())
-        .spawn(move || {
-            println!("[LucidClip Monitor] Clipboard monitor started.");
-            let mut last_hash: Option<String> = None;
-
-            while !stop.load(Ordering::Relaxed) {
-                let policy = monitor_policy(&pool);
-                if policy.enabled {
-                    let foreground = match platform::foreground_process_name() {
-                        Ok(name) => name,
-                        Err(err) => {
-                            eprintln!("[LucidClip Monitor] Could not resolve source app: {err}");
-                            None
-                        }
-                    };
-
-                    if is_excluded_process(&policy, foreground.as_deref()) {
-                        thread::sleep(POLL_INTERVAL);
-                        continue;
-                    }
-
-                    if policy.exclude_sensitive {
-                        match platform::clipboard_content_is_sensitive() {
-                            Ok(true) => {
-                                thread::sleep(POLL_INTERVAL);
-                                continue;
-                            }
-                            Ok(false) => {}
-                            Err(err) => {
-                                eprintln!(
-                                    "[LucidClip Monitor] Sensitive-content check failed; skipping tick: {err}"
-                                );
-                                thread::sleep(POLL_INTERVAL);
-                                continue;
-                            }
-                        }
-                    }
-
-                    match platform::read_clipboard_text() {
-                        Ok(Some(text)) if !text.trim().is_empty() => {
-                            if text.chars().count() > MAX_CAPTURE_CHARS {
-                                eprintln!(
-                                    "[LucidClip Monitor] Skipped clipboard content larger than {MAX_CAPTURE_CHARS} characters."
-                                );
-                            } else {
-                                let hash = hash_content(&text);
-                                if last_hash.as_deref() != Some(hash.as_str()) {
-                                    let service = ClipboardService::new(&pool);
-                                    match service.process_copied_text(&text, foreground) {
-                                        Ok(entry) => {
-                                            last_hash = Some(hash);
-                                            if let Err(err) =
-                                                app.emit(CLIPBOARD_CAPTURED_EVENT, &entry)
-                                            {
-                                                eprintln!(
-                                                    "[LucidClip Monitor] Failed to notify frontend: {err}"
-                                                );
-                                            }
-                                        }
-                                        Err(err) => {
-                                            eprintln!(
-                                                "[LucidClip Monitor] Failed to persist clipboard entry: {err}"
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Ok(_) => {}
-                        Err(err) => {
-                            // Clipboard contention is expected; retry on the next tick.
-                            eprintln!("[LucidClip Monitor] Clipboard read skipped: {err}");
-                        }
-                    }
-                }
-
-                thread::sleep(POLL_INTERVAL);
-            }
-
-            println!("[LucidClip Monitor] Clipboard monitor stopped.");
-        });
+        .spawn(move || run_monitor(app, pool, stop));
 
     if let Err(err) = spawned {
         eprintln!("[LucidClip Monitor] Failed to start monitor thread: {err}");
