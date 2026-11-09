@@ -61,9 +61,18 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
       )}
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <Badge variant={currentType.variant} size="sm" className="font-mono text-[9px] shrink-0">
-          {currentType.label}
-        </Badge>
+        {isClipboard && item.contentType === 'image' && item.thumbnailUrl ? (
+          <img
+            src={item.thumbnailUrl}
+            alt="Clipboard image thumbnail"
+            className="h-7 w-10 shrink-0 rounded-[3px] border border-graphite-border object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <Badge variant={currentType.variant} size="sm" className="font-mono text-[9px] shrink-0">
+            {currentType.label}
+          </Badge>
+        )}
         <span className="truncate flex-1">
           <HighlightText
             text={truncate(previewText, 90)}
