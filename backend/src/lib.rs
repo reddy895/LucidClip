@@ -14,7 +14,12 @@ use crate::database::{run_migrations, DbPool};
 use crate::storage::AppPaths;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, WindowEvent};
+
+const MAIN_WINDOW_LABEL: &str = "main";
+const TRAY_ID: &str = "lucidclip-tray";
 
 /// Core application state managed by Tauri runtime
 #[derive(Clone)]
@@ -32,6 +37,75 @@ impl AppState {
             monitor_stop,
         }
     }
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        eprintln!("[LucidClip] Main window is not available.");
+        return;
+    };
+
+    if let Err(err) = window.show() {
+        eprintln!("[LucidClip] Failed to show the main window: {err}");
+        return;
+    }
+    if let Err(err) = window.unminimize() {
+        eprintln!("[LucidClip] Failed to restore the main window: {err}");
+    }
+    if let Err(err) = window.set_focus() {
+        eprintln!("[LucidClip] Failed to focus the main window: {err}");
+    }
+}
+
+/// Install a tray icon so closing the window only hides it. Monitoring continues
+/// in the background until the user explicitly chooses Quit.
+fn setup_tray_icon(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let show_item = MenuItem::with_id(app, "show", "Show LucidClip", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit LucidClip", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .tooltip("LucidClip - clipboard and screenshot history")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+
+    builder.build(app)?;
+    Ok(())
+}
+
+fn hide_on_close(app: &tauri::AppHandle) {
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        return;
+    };
+
+    let window_for_event = window.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            if let Err(err) = window_for_event.hide() {
+                eprintln!("[LucidClip] Failed to hide the main window: {err}");
+            }
+        }
+    });
 }
 
 /// Main application runner invoked by main.rs
@@ -78,6 +152,15 @@ pub fn run() {
             app.manage(state);
 
             clipboard::spawn_monitor(app.handle().clone(), pool, monitor_stop);
+
+            match setup_tray_icon(app.handle()) {
+                Ok(()) => hide_on_close(app.handle()),
+                Err(err) => {
+                    eprintln!(
+                        "[LucidClip] System tray unavailable; closing the window will exit: {err}"
+                    );
+                }
+            }
 
             println!("[LucidClip] Backend context initialized successfully.");
             Ok(())
