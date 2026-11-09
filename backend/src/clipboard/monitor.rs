@@ -36,8 +36,13 @@ impl Default for MonitorPolicy {
     fn default() -> Self {
         Self {
             enabled: true,
-            excluded_apps: Vec::new(),
-            exclude_sensitive: false,
+            excluded_apps: vec![
+                "1Password.exe".into(),
+                "KeePass.exe".into(),
+                "KeePassXC.exe".into(),
+                "Bitwarden.exe".into(),
+            ],
+            exclude_sensitive: true,
         }
     }
 }

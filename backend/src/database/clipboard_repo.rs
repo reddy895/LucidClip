@@ -177,7 +177,10 @@ impl<'a> ClipboardRepo<'a> {
 
     pub fn clear_unpinned(&self) -> Result<usize> {
         self.pool.with_conn(|conn| {
-            let affected = conn.execute("DELETE FROM clipboard_entries WHERE pinned = 0", [])?;
+            let affected = conn.execute(
+                "DELETE FROM clipboard_entries WHERE pinned = 0 AND favorite = 0",
+                [],
+            )?;
             Ok(affected)
         })
     }
