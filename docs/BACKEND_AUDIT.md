@@ -9,9 +9,11 @@
 
 ## 2. Implemented Surface
 
-- Windows clipboard text read/write and `CF_DIB` image write.
+- Native Windows clipboard notifications with polling fallback.
+- Windows clipboard Unicode/ANSI text, `CF_DIB`/`CF_DIBV5` image, and `CF_HDROP` file-list capture.
+- Clipboard text, image, and file-list restore, including clipboard image thumbnails.
 - Foreground process lookup and sensitive-format detection.
-- Background clipboard polling with pause, exclusions, deduplication, and retention.
+- Background clipboard monitoring with pause, exclusions, deduplication, retention, and media cleanup.
 - GDI desktop capture, region crop, PNG originals, and thumbnails.
 - SQLite migrations and persistence for clipboard, screenshots, settings, and storage stats.
 - Launch-at-login through the per-user Windows registry.
