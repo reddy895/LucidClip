@@ -14,6 +14,8 @@ pub struct StorageStatsDto {
     pub db_size_bytes: u64,
     pub screenshot_storage_bytes: u64,
     pub total_storage_bytes: u64,
+    pub entry_count: usize,
+    pub screenshot_count: usize,
 }
 
 // ==========================================
@@ -192,9 +194,14 @@ pub fn get_storage_stats(state: tauri::State<'_, AppState>) -> Result<StorageSta
         }
     }
 
+    let entry_count = crate::database::ClipboardRepo::new(&state.pool).count()?;
+    let screenshot_count = crate::database::ScreenshotRepo::new(&state.pool).count()?;
+
     Ok(StorageStatsDto {
         db_size_bytes,
         screenshot_storage_bytes,
         total_storage_bytes: db_size_bytes + screenshot_storage_bytes,
+        entry_count,
+        screenshot_count,
     })
 }

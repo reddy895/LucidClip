@@ -182,6 +182,35 @@ impl<'a> ClipboardRepo<'a> {
         })
     }
 
+    /// Remove unpinned, non-favorite entries older than the cutoff timestamp.
+    pub fn purge_older_than(&self, cutoff_millis: i64) -> Result<usize> {
+        self.pool.with_conn(|conn| {
+            let affected = conn.execute(
+                "DELETE FROM clipboard_entries
+                 WHERE created_at < ?1 AND pinned = 0 AND favorite = 0",
+                [cutoff_millis],
+            )?;
+            Ok(affected)
+        })
+    }
+
+    /// Keep only the newest `max_items` rows, preserving pinned and favorite
+    /// entries even when they fall outside the window.
+    pub fn enforce_max_items(&self, max_items: usize) -> Result<usize> {
+        self.pool.with_conn(|conn| {
+            let affected = conn.execute(
+                "DELETE FROM clipboard_entries
+                 WHERE pinned = 0 AND favorite = 0
+                   AND id NOT IN (
+                     SELECT id FROM clipboard_entries
+                     ORDER BY created_at DESC LIMIT ?1
+                   )",
+                [max_items as i64],
+            )?;
+            Ok(affected)
+        })
+    }
+
     pub fn count(&self) -> Result<usize> {
         self.pool.with_conn(|conn| {
             let count: usize = conn.query_row(

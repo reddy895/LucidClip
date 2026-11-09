@@ -54,6 +54,15 @@ pub fn run() {
             run_migrations(&pool)
                 .expect("Failed to execute database migrations");
 
+            let service = clipboard::ClipboardService::new(&pool);
+            match service.enforce_retention() {
+                Ok(removed) if removed > 0 => {
+                    println!("[LucidClip] Purged {removed} clipboard entries by retention policy.");
+                }
+                Ok(_) => {}
+                Err(err) => eprintln!("[LucidClip] Startup retention cleanup failed: {err}"),
+            }
+
             let monitor_stop = Arc::new(AtomicBool::new(false));
             let state = AppState::new(pool.clone(), paths, monitor_stop.clone());
             app.manage(state);
