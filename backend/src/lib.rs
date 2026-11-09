@@ -148,10 +148,11 @@ pub fn run() {
             }
 
             let monitor_stop = Arc::new(AtomicBool::new(false));
+            let monitor_paths = paths.clone();
             let state = AppState::new(pool.clone(), paths, monitor_stop.clone());
             app.manage(state);
 
-            clipboard::spawn_monitor(app.handle().clone(), pool, monitor_stop);
+            clipboard::spawn_monitor(app.handle().clone(), pool, monitor_paths, monitor_stop);
 
             match setup_tray_icon(app.handle()) {
                 Ok(()) => hide_on_close(app.handle()),

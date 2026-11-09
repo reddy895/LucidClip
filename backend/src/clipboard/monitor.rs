@@ -16,6 +16,7 @@ use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
 use crate::database::{DbPool, SettingsRepo};
 use crate::platform;
+use crate::storage::AppPaths;
 
 /// Event emitted whenever the monitor persists a new clipboard entry.
 pub const CLIPBOARD_CAPTURED_EVENT: &str = "clipboard://new-entry";
@@ -130,6 +131,7 @@ struct CaptureState {
 fn capture_text_once(
     app: &AppHandle,
     pool: &DbPool,
+    paths: &AppPaths,
     policy: &MonitorPolicy,
     state: &mut CaptureState,
 ) {
@@ -172,7 +174,7 @@ fn capture_text_once(
                 return;
             }
 
-            let service = ClipboardService::new(pool);
+            let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_text(&text, foreground) {
                 Ok(entry) => {
                     state.last_hash = Some(hash);
@@ -197,7 +199,7 @@ fn capture_text_once(
     }
 }
 
-fn run_monitor(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
+fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<AtomicBool>) {
     println!("[LucidClip Monitor] Clipboard monitor started.");
     let mut state = CaptureState { last_hash: None };
 
@@ -221,7 +223,7 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
     // Capture the current clipboard once at startup.
     let policy = monitor_policy(&pool);
     if policy.enabled {
-        capture_text_once(&app, &pool, &policy, &mut state);
+        capture_text_once(&app, &pool, &paths, &policy, &mut state);
     }
 
     while !stop.load(Ordering::Relaxed) {
@@ -249,14 +251,14 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
 
         let policy = monitor_policy(&pool);
         if policy.enabled {
-            capture_text_once(&app, &pool, &policy, &mut state);
+            capture_text_once(&app, &pool, &paths, &policy, &mut state);
         }
     }
 
     println!("[LucidClip Monitor] Clipboard monitor stopped.");
 }
 
-pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
+pub fn spawn(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<AtomicBool>) {
     if !platform::clipboard_monitoring_supported() {
         println!("[LucidClip Monitor] Native clipboard monitoring is unavailable on this host.");
         return;
@@ -264,7 +266,7 @@ pub fn spawn(app: AppHandle, pool: Arc<DbPool>, stop: Arc<AtomicBool>) {
 
     let spawned = thread::Builder::new()
         .name("lucidclip-clipboard-monitor".into())
-        .spawn(move || run_monitor(app, pool, stop));
+        .spawn(move || run_monitor(app, pool, paths, stop));
 
     if let Err(err) = spawned {
         eprintln!("[LucidClip Monitor] Failed to start monitor thread: {err}");

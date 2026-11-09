@@ -1,7 +1,7 @@
 //! Storage for clipboard images captured from the operating system.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use sha2::{Digest, Sha256};
@@ -102,6 +102,7 @@ fn remove_file_if_exists(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn sample_image() -> CapturedImage {
         CapturedImage {

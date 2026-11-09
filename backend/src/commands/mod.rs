@@ -24,7 +24,7 @@ pub struct StorageStatsDto {
 
 #[tauri::command]
 pub fn get_clipboard_entries(state: tauri::State<'_, AppState>) -> Result<Vec<DbClipboardEntry>> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.get_history()
 }
 
@@ -34,7 +34,7 @@ pub fn add_clipboard_entry(
     source_app: Option<String>,
     state: tauri::State<'_, AppState>,
 ) -> Result<DbClipboardEntry> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.process_copied_text(&content, source_app)
 }
 
@@ -46,25 +46,25 @@ pub fn copy_clipboard_entry(content: String) -> Result<bool> {
 
 #[tauri::command]
 pub fn delete_clipboard_entry(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.delete_entry(&id)
 }
 
 #[tauri::command]
 pub fn toggle_clipboard_pin(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.toggle_pin(&id)
 }
 
 #[tauri::command]
 pub fn toggle_clipboard_favorite(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.toggle_favorite(&id)
 }
 
 #[tauri::command]
 pub fn clear_clipboard_history(state: tauri::State<'_, AppState>) -> Result<usize> {
-    let service = ClipboardService::new(&state.pool);
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
     service.clear_unpinned()
 }
 
