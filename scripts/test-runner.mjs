@@ -123,6 +123,60 @@ describe('LucidClip Core Integrity Verification', () => {
     assert.ok(cap.permissions.includes('core:default'), 'Must declare core:default');
   });
 
+  test('Native clipboard surface: notifications, media capture, and restore are wired', () => {
+    const watcherPath = path.join(backendDir, 'src/platform/clipboard_watcher.rs');
+    assert.ok(fs.existsSync(watcherPath), 'Native clipboard watcher must exist');
+    const watcherSource = fs.readFileSync(watcherPath, 'utf8');
+    for (const marker of ['AddClipboardFormatListener', 'WM_CLIPBOARDUPDATE']) {
+      assert.ok(watcherSource.includes(marker), `Clipboard watcher must use ${marker}`);
+    }
+
+    const monitorSource = fs.readFileSync(
+      path.join(backendDir, 'src/clipboard/monitor.rs'),
+      'utf8'
+    );
+    for (const marker of [
+      'read_clipboard_snapshot',
+      'ClipboardSnapshot::Image',
+      'ClipboardSnapshot::Files',
+    ]) {
+      assert.ok(monitorSource.includes(marker), `Monitor must handle ${marker}`);
+    }
+
+    const platformSource = fs.readFileSync(
+      path.join(backendDir, 'src/platform/clipboard.rs'),
+      'utf8'
+    );
+    for (const marker of ['CF_HDROP', 'CF_DIBV5', 'build_dropfiles', 'parse_dib']) {
+      assert.ok(platformSource.includes(marker), `Clipboard platform must define ${marker}`);
+    }
+
+    const migrationSource = fs.readFileSync(
+      path.join(backendDir, 'src/database/migrations.rs'),
+      'utf8'
+    );
+    for (const column of ['image_path', 'thumbnail_path', 'image_width', 'image_height', 'byte_size', 'file_count']) {
+      assert.ok(
+        migrationSource.includes(`ADD COLUMN ${column}`),
+        `Clipboard media migration must add ${column}`
+      );
+    }
+
+    const libSource = fs.readFileSync(path.join(backendDir, 'src/lib.rs'), 'utf8');
+    assert.ok(
+      libSource.includes('commands::copy_clipboard_entry_by_id'),
+      'Restore-by-id command must be registered'
+    );
+
+    const frontendService = fs.readFileSync(
+      path.join(rootDir, 'frontend/src/services/tauri/TauriClipboardService.ts'),
+      'utf8'
+    );
+    for (const marker of ['image_path', 'thumbnail_path', 'convertFileSrc', 'copy_clipboard_entry_by_id']) {
+      assert.ok(frontendService.includes(marker), `Frontend clipboard service must use ${marker}`);
+    }
+  });
+
   test('Rust Backend Unit Tests: SQLite migrations, classification, and deduplication pass', () => {
     const output = execSync('cargo test', {
       cwd: backendDir,
