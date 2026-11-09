@@ -480,6 +480,7 @@ mod windows_clipboard {
             ));
         }
 
+        wide.truncate(written as usize);
         Ok(Some(String::from_utf16_lossy(&wide)))
     }
 
