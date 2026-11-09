@@ -128,7 +128,7 @@ export const QuickAccessOverlay: React.FC = () => {
 
           {filteredItems.length === 0 ? (
             <div className="py-8 text-center text-xs text-graphite-text-muted">
-              No matching clipboard entries found.
+              No matching items found.
             </div>
           ) : (
             filteredItems.map((item, index) => (
@@ -152,7 +152,7 @@ export const QuickAccessOverlay: React.FC = () => {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <CornerDownLeft className="h-3 w-3 text-accent" />
-              <span>Copy & Paste</span>
+              <span>Copy to clipboard</span>
             </span>
             <span className="flex items-center gap-1">
               <ArrowUpDown className="h-3 w-3 text-graphite-text-muted" />

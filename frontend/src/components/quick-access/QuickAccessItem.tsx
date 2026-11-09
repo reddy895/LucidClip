@@ -28,6 +28,8 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
     code: { label: item.kind === 'clipboard' && item.language ? item.language.toUpperCase() : 'CODE', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
     url: { label: 'URL', icon: <LinkIcon className="h-3 w-3" />, variant: 'accent' as const },
     json: { label: 'JSON', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
+    color_code: { label: 'COLOR', icon: <FileText className="h-3 w-3" />, variant: 'accent' as const },
+    path: { label: 'PATH', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
     screenshot: { label: 'IMG', icon: <Camera className="h-3 w-3" />, variant: 'default' as const },
   };
 

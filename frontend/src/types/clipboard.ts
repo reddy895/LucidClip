@@ -1,4 +1,11 @@
-export type ClipboardContentType = 'text' | 'code' | 'url' | 'json' | 'multiline';
+export type ClipboardContentType =
+  | 'text'
+  | 'code'
+  | 'url'
+  | 'json'
+  | 'multiline'
+  | 'color_code'
+  | 'path';
 
 export interface ClipboardEntry {
   id: string;

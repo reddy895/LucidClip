@@ -22,9 +22,9 @@ function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
   const iso = new Date(dto.created_at).toISOString();
 
   let contentType: ClipboardContentType = 'text';
-  if (dto.content_type === 'multiline') {
-    contentType = 'multiline';
-  } else if (['code', 'url', 'json'].includes(dto.content_type)) {
+  if (
+    ['multiline', 'code', 'url', 'json', 'color_code', 'path'].includes(dto.content_type)
+  ) {
     contentType = dto.content_type as ClipboardContentType;
   }
 
@@ -45,13 +45,8 @@ function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
 
 export class TauriClipboardService implements IClipboardService {
   async getHistory(): Promise<ClipboardEntry[]> {
-    try {
-      const list = await invoke<DbClipboardDto[]>('get_clipboard_entries');
-      return list.map(mapDtoToEntry);
-    } catch (err) {
-      console.error('[LucidClip] Failed to fetch clipboard history from backend:', err);
-      return [];
-    }
+    const list = await invoke<DbClipboardDto[]>('get_clipboard_entries');
+    return list.map(mapDtoToEntry);
   }
 
   async getEntryById(id: string): Promise<ClipboardEntry | null> {
@@ -60,12 +55,7 @@ export class TauriClipboardService implements IClipboardService {
   }
 
   async copyToClipboard(content: string): Promise<boolean> {
-    try {
-      return await invoke<boolean>('copy_clipboard_entry', { content });
-    } catch (err) {
-      console.error('[LucidClip] Failed to copy to clipboard via backend:', err);
-      return false;
-    }
+    return await invoke<boolean>('copy_clipboard_entry', { content });
   }
 
   async togglePin(id: string): Promise<ClipboardEntry> {
@@ -83,12 +73,7 @@ export class TauriClipboardService implements IClipboardService {
   }
 
   async deleteEntry(id: string): Promise<boolean> {
-    try {
-      return await invoke<boolean>('delete_clipboard_entry', { id });
-    } catch (err) {
-      console.error('[LucidClip] Failed to delete entry via backend:', err);
-      return false;
-    }
+    return await invoke<boolean>('delete_clipboard_entry', { id });
   }
 
   async clearHistory(): Promise<void> {

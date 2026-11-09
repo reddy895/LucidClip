@@ -60,6 +60,8 @@ export const ClipboardView: React.FC = () => {
     { id: 'url', label: 'URLs' },
     { id: 'multiline', label: 'Notes' },
     { id: 'json', label: 'JSON' },
+    { id: 'color_code', label: 'Colors' },
+    { id: 'path', label: 'Paths' },
   ];
 
   return (

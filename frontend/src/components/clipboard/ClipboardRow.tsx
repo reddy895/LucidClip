@@ -52,6 +52,8 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
     },
     url: { label: 'URL', icon: <LinkIcon className="h-3 w-3" />, variant: 'accent' as const },
     json: { label: 'JSON', icon: <Code className="h-3 w-3" />, variant: 'accent' as const },
+    color_code: { label: 'COLOR', icon: <FileText className="h-3 w-3" />, variant: 'accent' as const },
+    path: { label: 'PATH', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
   };
 
   const config = typeConfig[entry.contentType];
