@@ -8,6 +8,7 @@ import {
   SortOrder,
   AppSettings,
   CaptureType,
+  ScreenshotRegion,
 } from '@/types';
 import {
   clipboardService,
@@ -64,6 +65,9 @@ interface AppContextValue {
   deleteItem: (item: HistoryItem) => Promise<boolean>;
   clearClipboardHistory: () => Promise<void>;
   captureScreenshot: (type: CaptureType) => Promise<void>;
+  regionCaptureSource: ScreenshotEntry | null;
+  cancelRegionCapture: () => Promise<void>;
+  confirmRegionCapture: (region: ScreenshotRegion) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   resetSettings: () => Promise<void>;
   toggleMonitoring: () => Promise<void>;
@@ -87,6 +91,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [clipboardItems, setClipboardItems] = useState<ClipboardEntry[]>([]);
   const [screenshotItems, setScreenshotItems] = useState<ScreenshotEntry[]>([]);
+  const [regionCaptureSource, setRegionCaptureSource] = useState<ScreenshotEntry | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,12 +270,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const captureScreenshot = async (type: CaptureType) => {
     try {
+      if (type === 'region') {
+        const source = await screenshotService.beginRegionCapture();
+        setRegionCaptureSource(source);
+        return;
+      }
+
       const shot = await screenshotService.captureScreen(type);
       setScreenshotItems((prev) => [shot, ...prev]);
       setSelectedItem({ kind: 'screenshot', ...shot });
       toast.success('Screenshot saved.');
     } catch (err) {
       reportActionError('Screenshot capture', err);
+      throw err;
+    }
+  };
+
+  const cancelRegionCapture = async () => {
+    const source = regionCaptureSource;
+    setRegionCaptureSource(null);
+    if (!source) return;
+
+    try {
+      await screenshotService.deleteScreenshot(source.id);
+    } catch (err) {
+      console.error('[LucidClip] Failed to discard region capture source', err);
+    }
+  };
+
+  const confirmRegionCapture = async (region: ScreenshotRegion) => {
+    const source = regionCaptureSource;
+    if (!source) return;
+
+    try {
+      const shot = await screenshotService.cropScreenshot(source.id, region, true);
+      setScreenshotItems((prev) => [
+        shot,
+        ...prev.filter((item) => item.id !== source.id),
+      ]);
+      setRegionCaptureSource(null);
+      setSelectedItem({ kind: 'screenshot', ...shot });
+      toast.success('Region screenshot saved.');
+    } catch (err) {
+      reportActionError('Region capture', err);
       throw err;
     }
   };
@@ -338,6 +380,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteItem,
         clearClipboardHistory,
         captureScreenshot,
+        regionCaptureSource,
+        cancelRegionCapture,
+        confirmRegionCapture,
         updateSettings,
         resetSettings,
         toggleMonitoring,

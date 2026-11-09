@@ -3,6 +3,7 @@ import { ToastProvider, AppProvider, useApp } from '@/context';
 import { MainLayout, AppFooter } from '@/components/layout';
 import { PreviewPanel } from '@/components/preview';
 import { QuickAccessOverlay } from '@/components/quick-access';
+import { RegionCaptureDialog } from '@/components/screenshots/RegionCaptureDialog';
 import { useDesktopShortcuts } from '@/hooks';
 import {
   AllItemsView,
@@ -68,6 +69,8 @@ const AppContent: React.FC = () => {
 
       {/* Floating Quick Access Overlay */}
       <QuickAccessOverlay />
+
+      <RegionCaptureDialog />
     </>
   );
 };
