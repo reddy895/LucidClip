@@ -112,3 +112,4 @@ This runs:
 - `scripts/test/error-reporter.test.mjs`: Tests diagnostic error message formatting.
 - `scripts/test/port-conflict-regression.test.mjs`: Tests conflict detection and resolution paths.
 - `scripts/test/launcher-lifecycle.test.mjs`: Tests command-line launcher execution, signal handling, and clean startup.
+

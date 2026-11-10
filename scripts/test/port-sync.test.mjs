@@ -35,3 +35,4 @@ describe('Vite and Tauri Port Synchronization Tests', () => {
     assert.equal(result.tauriPort, DEV_SERVER_PORT);
   });
 });
+

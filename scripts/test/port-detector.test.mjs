@@ -35,3 +35,4 @@ describe('Port Availability Detector Tests', () => {
     assert.equal(afterClose.available, true);
   });
 });
+

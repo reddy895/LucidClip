@@ -33,3 +33,4 @@ describe('Process Info Module Tests', () => {
     assert.equal(details.isLucidClip, false);
   });
 });
+

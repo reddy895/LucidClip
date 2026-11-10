@@ -23,3 +23,4 @@ describe('Process Cleanup Tests', () => {
     assert.equal(fakeInfo.isLucidClip, false);
   });
 });
+

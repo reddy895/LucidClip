@@ -38,3 +38,4 @@ describe('Error Reporter Tests', () => {
     assert.ok(formatted.includes('54321'));
   });
 });
+

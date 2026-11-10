@@ -81,3 +81,4 @@ describe('Launcher Lifecycle and Conflict Tests', () => {
     assert.equal(isDead, true);
   });
 });
+
