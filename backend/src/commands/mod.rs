@@ -128,6 +128,7 @@ pub fn get_monitor_status(state: tauri::State<'_, AppState>) -> crate::clipboard
 /// effect for any clipboard change after this command returns.
 #[tauri::command]
 pub fn set_monitoring_enabled(
+    app: tauri::AppHandle,
     enabled: bool,
     state: tauri::State<'_, AppState>,
 ) -> Result<crate::clipboard::MonitorStatus> {
@@ -183,6 +184,7 @@ pub fn set_monitoring_enabled(
         status.last_error = None;
     }
 
+    crate::clipboard::monitor::emit_status(&app, &state.monitor_status);
     Ok(crate::clipboard::status_snapshot(&state.monitor_status))
 }
 

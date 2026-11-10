@@ -495,7 +495,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const unifiedHistory: HistoryItem[] = [
     ...clipboardItems.map((c) => ({ kind: 'clipboard' as const, ...c })),
     ...screenshotItems.map((s) => ({ kind: 'screenshot' as const, ...s })),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  ].sort((a, b) => {
+    const delta = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return delta !== 0 ? delta : b.id.localeCompare(a.id);
+  });
 
   return (
     <AppContext.Provider

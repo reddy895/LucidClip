@@ -89,7 +89,7 @@ fn update_status(status: &Arc<Mutex<MonitorStatus>>, update: impl FnOnce(&mut Mo
     }
 }
 
-fn emit_status(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>) {
+pub(crate) fn emit_status(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>) {
     if let Err(err) = app.emit(CLIPBOARD_STATUS_EVENT, status_snapshot(status)) {
         eprintln!("[LucidClip Monitor] Failed to notify frontend about monitor status: {err}");
     }
