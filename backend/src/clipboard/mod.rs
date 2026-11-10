@@ -4,11 +4,13 @@ pub mod classifier;
 pub mod hasher;
 pub mod media;
 pub mod monitor;
+pub mod normalize;
 pub mod service;
 
 pub use classifier::{classify_content, ClipboardContentType};
 pub use hasher::hash_content;
 pub use monitor::{spawn as spawn_monitor, CLIPBOARD_CAPTURED_EVENT};
+pub use normalize::{canonical_text, normalize_text};
 pub use service::ClipboardService;
 
 #[cfg(test)]

@@ -2,14 +2,14 @@
 
 use sha2::{Digest, Sha256};
 
-/// Computes SHA-256 hash of normalized clipboard content.
-/// Normalizes CRLF line endings to LF and trims trailing line endings for consistent deduplication.
+use crate::clipboard::normalize::canonical_text;
+
+/// Computes SHA-256 hash of canonical clipboard text.
+///
+/// Canonicalization converts CRLF/CR to LF, removes NUL bytes, and ignores
+/// trailing line endings so repeated copies deduplicate consistently.
 pub fn hash_content(content: &str) -> String {
-    let normalized = content
-        .replace("\r\n", "\n")
-        .trim_end_matches(['\r', '\n'])
-        .to_string();
-    hash_bytes(b"", normalized.as_bytes())
+    hash_bytes(b"", canonical_text(content).as_bytes())
 }
 
 /// Hash bytes with a domain separator so distinct clipboard kinds cannot collide.

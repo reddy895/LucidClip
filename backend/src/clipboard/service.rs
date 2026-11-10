@@ -6,6 +6,7 @@ use std::fs;
 use crate::clipboard::classifier::classify_content;
 use crate::clipboard::hasher::{hash_bytes, hash_content};
 use crate::clipboard::media;
+use crate::clipboard::normalize::{canonical_text, normalize_text};
 use crate::database::{ClipboardRepo, DbClipboardEntry, DbPool, SettingsRepo};
 use crate::errors::{AppError, Result};
 use crate::platform::CapturedImage;
@@ -45,7 +46,16 @@ impl<'a> ClipboardService<'a> {
         raw_text: &str,
         source_app: Option<String>,
     ) -> Result<DbClipboardEntry> {
-        let content_hash = hash_content(raw_text);
+        if canonical_text(raw_text).trim().is_empty() {
+            return Err(AppError::InvalidInput(
+                "Clipboard text is empty after normalization".into(),
+            ));
+        }
+
+        // Normalize once so classification, hashing, display, and storage all
+        // operate on the same content.
+        let content = normalize_text(raw_text);
+        let content_hash = hash_content(&content);
         let now = Utc::now().timestamp_millis();
 
         // Check if an entry with this hash already exists
@@ -57,11 +67,12 @@ impl<'a> ClipboardService<'a> {
 
         // Generate unique entry ID
         let entry_id = format!("clip_{}_{}", now, &content_hash[..8]);
-        let content_type = classify_content(raw_text).as_str().to_string();
+        let content_type = classify_content(&content).as_str().to_string();
+        let byte_size = content.len() as u64;
 
         let new_entry = DbClipboardEntry {
             id: entry_id,
-            content: raw_text.to_string(),
+            content,
             content_type,
             source_app,
             created_at: now,
@@ -72,7 +83,7 @@ impl<'a> ClipboardService<'a> {
             thumbnail_path: None,
             image_width: None,
             image_height: None,
-            byte_size: raw_text.len() as u64,
+            byte_size,
             file_count: 0,
         };
 
@@ -541,6 +552,36 @@ mod tests {
         assert!(!std::path::Path::new(&original).exists());
         assert!(!std::path::Path::new(&thumbnail).exists());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn text_is_normalized_before_persistence_and_deduplication() {
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ClipboardService::new(&pool);
+
+        let entry = service
+            .process_copied_text("line one\r\nline two\0", Some("Editor".into()))
+            .unwrap();
+        assert_eq!(entry.content, "line one\nline two");
+        assert_eq!(entry.byte_size, entry.content.len() as u64);
+
+        let again = service
+            .process_copied_text("line one\nline two\r\n\r\n", None)
+            .unwrap();
+        assert_eq!(again.id, entry.id);
+        assert_eq!(service.get_history().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn empty_or_whitespace_only_text_is_rejected() {
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ClipboardService::new(&pool);
+
+        assert!(service.process_copied_text("", None).is_err());
+        assert!(service.process_copied_text(" \r\n\0 ", None).is_err());
+        assert_eq!(service.get_history().unwrap().len(), 0);
     }
 
     #[test]
