@@ -22,7 +22,8 @@ use crate::storage::AppPaths;
 pub const CLIPBOARD_CAPTURED_EVENT: &str = "clipboard://new-entry";
 
 /// Fallback sampling interval when native change notifications are unavailable.
-const POLL_INTERVAL: Duration = Duration::from_millis(500);
+/// Deliberately conservative so an unsupported host never spins the CPU.
+const POLL_INTERVAL: Duration = Duration::from_millis(750);
 
 /// Native notifications can arrive before the source application has finished
 /// writing all formats. Wait briefly, then coalesce the burst.
@@ -234,10 +235,21 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
     println!("[LucidClip Monitor] Clipboard monitor started.");
     let mut state = CaptureState { last_hash: None };
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     let native_notifications = {
         let (notify_tx, notify_rx) = mpsc::sync_channel::<()>(1);
-        match platform::spawn_clipboard_watcher(notify_tx, stop.clone()) {
+        let result = {
+            #[cfg(target_os = "windows")]
+            {
+                platform::spawn_clipboard_watcher(notify_tx, stop.clone())
+            }
+            #[cfg(target_os = "linux")]
+            {
+                platform::spawn_clipboard_watcher(notify_tx)
+            }
+        };
+
+        match result {
             Ok(()) => Some(notify_rx),
             Err(err) => {
                 eprintln!(
@@ -248,7 +260,7 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
         }
     };
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     let native_notifications: Option<mpsc::Receiver<()>> = None;
 
     // Capture the current clipboard once at startup.
@@ -283,6 +295,10 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
         let policy = monitor_policy(&pool);
         if policy.enabled {
             capture_clipboard_once(&app, &pool, &paths, &policy, &mut state);
+        } else {
+            // Forget the last fingerprint so resuming captures the current
+            // clipboard again instead of silently treating it as a duplicate.
+            state.last_hash = None;
         }
     }
 
@@ -291,7 +307,15 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
 
 pub fn spawn(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<AtomicBool>) {
     if !platform::clipboard_monitoring_supported() {
-        println!("[LucidClip Monitor] Native clipboard monitoring is unavailable on this host.");
+        let environment = platform::clipboard_environment();
+        eprintln!(
+            "[LucidClip Monitor] Clipboard monitoring is unavailable (backend {}, session {}).",
+            environment.backend,
+            environment.session.as_str()
+        );
+        for diagnostic in environment.diagnostics {
+            eprintln!("[LucidClip Monitor] {diagnostic}");
+        }
         return;
     }
 

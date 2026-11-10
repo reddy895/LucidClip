@@ -125,6 +125,22 @@ pub fn run() {
 
             run_migrations(&pool).expect("Failed to execute database migrations");
 
+            // Linux must initialize GTK clipboard access on the main thread
+            // before the monitor thread starts. Windows has no such constraint.
+            if let Err(err) = platform::initialize_clipboard_backend() {
+                eprintln!("[LucidClip] Clipboard backend initialization failed: {err}");
+            }
+            let environment = platform::clipboard_environment();
+            println!(
+                "[LucidClip] Clipboard backend: {} (session {}, monitoring supported: {})",
+                environment.backend,
+                environment.session.as_str(),
+                environment.monitoring_supported
+            );
+            for diagnostic in &environment.diagnostics {
+                println!("[LucidClip] Clipboard diagnostic: {diagnostic}");
+            }
+
             if let Ok(Some(raw)) = database::SettingsRepo::new(&pool).get("app_settings") {
                 if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&raw) {
                     if let Some(enabled) = settings
