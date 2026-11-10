@@ -83,10 +83,33 @@ verified to work when invoked from both the root and `backend/`.
 
 - GNOME Wayland restricts background clipboard access for some compositors.
   The GTK backend is verified on this host; other compositors must be tested.
-- Linux image writing uses GTK pixbufs; Linux file-list writing is not exposed
-  by the GTK Rust bindings and is reported as unsupported rather than faked.
+- Linux image writing uses GTK pixbufs, and file-list writing uses a
+  `text/uri-list` `set_with_data` handler.
 - Sensitive-content markers are a Windows convention. On Linux LucidClip can
   only recognize the KDE password-manager hint target; it does not claim
   perfect detection.
 - Windows behaviour is preserved by conditional compilation and cannot be
   re-verified on this Linux host.
+
+## Resolution (implemented)
+
+The audit above describes the original state. The current tree implements the
+fix strategy:
+
+- `platform/clipboard_linux.rs` provides GTK-backed read, write, and
+  `owner-change` watching; all GTK calls are marshalled to the main context.
+- `platform/environment.rs` reports the session, backend, optional CLI tools,
+  and actionable diagnostics.
+- `clipboard/monitor.rs` runs on Linux, shares its deduplication fingerprint
+  with manual capture, and exposes lifecycle status and errors without logging
+  clipboard content.
+- `clipboard/events.rs` defines a versioned capture event and a status event.
+- IPC commands expose diagnostics, monitor status, pause/resume, and manual
+  capture; the Settings UI renders them.
+- Text is normalized before hashing and persistence, and history is ordered by
+  `created_at DESC, id DESC` with a supporting index.
+- `backend/examples/clipboard_probe.rs` verifies a real GTK read/write
+  round-trip; it reported `round-trip: ok` on the GNOME Wayland host.
+- Backend tests and frontend contract tests cover the pure logic and IPC
+  surface. End-to-end monitoring on other compositors still requires manual
+  verification.
