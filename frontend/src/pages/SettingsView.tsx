@@ -51,9 +51,21 @@ export const SettingsView: React.FC = () => {
 
   const monitoringSupported =
     monitorStatus?.supported ?? clipboardDiagnostics?.monitoring_supported ?? true;
+  const monitoringStopped = monitorStatus
+    ? monitorStatus.supported &&
+      !monitorStatus.running &&
+      (monitorStatus.started_at !== null || monitorStatus.last_error !== null)
+    : false;
   const monitoringActive = monitorStatus
     ? monitorStatus.running && !monitorStatus.paused
     : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+  const monitoringBadge = !monitoringSupported
+    ? { label: 'Unsupported', variant: 'error' as const }
+    : monitoringStopped
+      ? { label: 'Stopped', variant: 'error' as const }
+      : monitoringActive
+        ? { label: 'Active', variant: 'success' as const }
+        : { label: 'Paused', variant: 'warning' as const };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: 'General', icon: <Sliders className="h-4 w-4" /> },
@@ -220,21 +232,8 @@ export const SettingsView: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2 text-xs font-medium text-graphite-text-primary">
                       Enable clipboard monitoring
-                      <Badge
-                        variant={
-                          !monitoringSupported
-                            ? 'error'
-                            : monitoringActive
-                              ? 'success'
-                              : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {!monitoringSupported
-                          ? 'Unsupported'
-                          : monitoringActive
-                            ? 'Active'
-                            : 'Paused'}
+                      <Badge variant={monitoringBadge.variant} size="sm">
+                        {monitoringBadge.label}
                       </Badge>
                     </div>
                     <div className="text-[11px] text-graphite-text-muted">
@@ -243,7 +242,7 @@ export const SettingsView: React.FC = () => {
                   </div>
                   <Toggle
                     checked={monitoringActive}
-                    disabled={!monitoringSupported}
+                    disabled={!monitoringSupported || monitoringStopped}
                     onChange={(checked) => setMonitoringEnabled(checked)}
                     aria-label="Enable clipboard monitoring"
                   />
@@ -256,6 +255,16 @@ export const SettingsView: React.FC = () => {
                       This environment has no usable clipboard backend. The desktop app needs a
                       Windows session with access to the clipboard API, or a Linux session with a
                       GTK clipboard provider.
+                    </span>
+                  </div>
+                )}
+
+                {monitoringStopped && (
+                  <div className="flex items-start gap-2 rounded-btn border border-status-error/30 bg-status-error-bg p-3 text-[11px] text-status-error">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      The clipboard monitor started but is no longer running. Restart LucidClip to
+                      recover it. {monitorStatus?.last_error ?? ''}
                     </span>
                   </div>
                 )}
@@ -284,7 +293,7 @@ export const SettingsView: React.FC = () => {
                     size="sm"
                     icon={<Activity className="h-3.5 w-3.5" />}
                     isLoading={isCapturing}
-                    disabled={!monitoringSupported}
+                    disabled={!monitoringSupported || monitoringStopped}
                     onClick={async () => {
                       setIsCapturing(true);
                       try {

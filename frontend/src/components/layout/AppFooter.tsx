@@ -14,21 +14,28 @@ export const AppFooter: React.FC = () => {
   } = useApp();
 
   const monitoringUnsupported = monitorStatus ? !monitorStatus.supported : false;
+  const monitoringStopped = monitorStatus
+    ? monitorStatus.supported &&
+      !monitorStatus.running &&
+      (monitorStatus.started_at !== null || monitorStatus.last_error !== null)
+    : false;
   const isMonitoring = monitorStatus
     ? monitorStatus.running && !monitorStatus.paused
     : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
   const monitorLabel = monitoringUnsupported
     ? 'Monitoring Unavailable'
-    : isMonitoring
-      ? 'Monitoring Active'
-      : 'Monitoring Paused';
+    : monitoringStopped
+      ? 'Monitoring Stopped'
+      : isMonitoring
+        ? 'Monitoring Active'
+        : 'Monitoring Paused';
   const dbBytes = storageStats?.dbSizeBytes ?? 0;
 
   return (
     <footer className="flex h-6 w-full items-center justify-between border-t border-graphite-border bg-graphite-sidebar px-3 text-[11px] text-graphite-text-muted select-none shrink-0 z-10">
       {/* Left: Monitoring status */}
       <div className="flex items-center gap-1.5">
-        {monitoringUnsupported ? (
+        {monitoringUnsupported || monitoringStopped ? (
           <>
             <ShieldAlert className="h-3 w-3 text-status-error" />
             <span className="text-status-error">{monitorLabel}</span>

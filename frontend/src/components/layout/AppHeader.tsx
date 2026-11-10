@@ -27,6 +27,12 @@ export const AppHeader: React.FC = () => {
     ? monitorStatus.running && !monitorStatus.paused
     : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
   const monitoringUnsupported = monitorStatus ? !monitorStatus.supported : false;
+  const monitoringStopped = monitorStatus
+    ? monitorStatus.supported &&
+      !monitorStatus.running &&
+      (monitorStatus.started_at !== null || monitorStatus.last_error !== null)
+    : false;
+  const monitoringUnavailable = monitoringUnsupported || monitoringStopped;
 
   return (
     <header className="flex h-11 w-full items-center justify-between border-b border-graphite-border bg-graphite-sidebar px-3 select-none shrink-0 z-20">
@@ -81,7 +87,9 @@ export const AppHeader: React.FC = () => {
           content={
             monitoringUnsupported
               ? 'Clipboard monitoring is unavailable in this session'
-              : isMonitoring
+              : monitoringStopped
+                ? 'The clipboard monitor is not running'
+                : isMonitoring
                 ? 'Monitoring Active (Click to pause)'
                 : 'Monitoring Paused (Click to resume)'
           }
@@ -89,13 +97,19 @@ export const AppHeader: React.FC = () => {
           <button
             type="button"
             onClick={toggleMonitoring}
-            disabled={monitoringUnsupported}
+            disabled={monitoringUnavailable}
             className="flex h-7 items-center gap-1.5 rounded-btn px-2 text-[11px] font-medium transition-colors border border-transparent hover:border-graphite-border disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {monitoringUnsupported ? (
               <>
                 <ShieldAlert className="h-3.5 w-3.5 text-status-error" />
                 <span className="hidden md:inline text-status-error">Unavailable</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-status-error" />
+              </>
+            ) : monitoringStopped ? (
+              <>
+                <ShieldAlert className="h-3.5 w-3.5 text-status-error" />
+                <span className="hidden md:inline text-status-error">Stopped</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-status-error" />
               </>
             ) : isMonitoring ? (
