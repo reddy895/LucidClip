@@ -122,7 +122,7 @@ impl<'a> ClipboardRepo<'a> {
     pub fn list_all(&self) -> Result<Vec<DbClipboardEntry>> {
         self.pool.with_conn(|conn| {
             let mut stmt = conn.prepare(&format!(
-                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries ORDER BY created_at DESC"
+                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries ORDER BY created_at DESC, id DESC"
             ))?;
 
             let entries = stmt

@@ -81,6 +81,12 @@ pub const MIGRATIONS: &[Migration] = &[
               ALTER TABLE clipboard_entries ADD COLUMN byte_size INTEGER NOT NULL DEFAULT 0;
               ALTER TABLE clipboard_entries ADD COLUMN file_count INTEGER NOT NULL DEFAULT 0;",
     },
+    Migration {
+        version: 7,
+        description: "stabilize clipboard history ordering",
+        sql: "CREATE INDEX IF NOT EXISTS idx_clipboard_created_id
+              ON clipboard_entries(created_at DESC, id DESC);",
+    },
 ];
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {

@@ -50,6 +50,36 @@ mod tests {
     }
 
     #[test]
+    fn list_all_orders_equal_timestamps_deterministically() {
+        let pool = DbPool::open_in_memory().expect("failed to open in-memory db");
+        run_migrations(&pool).expect("failed to run migrations");
+        let repo = ClipboardRepo::new(&pool);
+
+        for (id, hash) in [("clip_a", "hash-a"), ("clip_b", "hash-b")] {
+            repo.insert(&DbClipboardEntry {
+                id: id.to_string(),
+                content: id.to_string(),
+                content_type: "plain".to_string(),
+                source_app: None,
+                created_at: 1000,
+                content_hash: hash.to_string(),
+                pinned: false,
+                favorite: false,
+                image_path: None,
+                thumbnail_path: None,
+                image_width: None,
+                image_height: None,
+                byte_size: id.len() as u64,
+                file_count: 0,
+            })
+            .unwrap();
+        }
+
+        let ids: Vec<String> = repo.list_all().unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids, vec!["clip_b".to_string(), "clip_a".to_string()]);
+    }
+
+    #[test]
     fn test_migrations_and_repositories() {
         let pool = DbPool::open_in_memory().expect("failed to open in-memory db");
         run_migrations(&pool).expect("failed to run migrations");
