@@ -9,6 +9,8 @@ import {
   AppSettings,
   CaptureType,
   ScreenshotRegion,
+  ClipboardDiagnostics,
+  ClipboardMonitorStatus,
 } from '@/types';
 import {
   clipboardService,
@@ -24,6 +26,12 @@ import {
   DbClipboardDto,
   mapDtoToEntry as mapClipboardDtoToEntry,
 } from '@/services/tauri/TauriClipboardService';
+import {
+  CLIPBOARD_EVENT_NAME,
+  CLIPBOARD_STATUS_EVENT_NAME,
+  mergeClipboardEntry,
+  validateClipboardEventPayload,
+} from '@/utils/clipboardSync';
 import { useToast } from './ToastContext';
 
 interface AppContextValue {
@@ -59,6 +67,8 @@ interface AppContextValue {
   unifiedHistory: HistoryItem[];
   settings: AppSettings;
   storageStats: StorageStats | null;
+  clipboardDiagnostics: ClipboardDiagnostics | null;
+  monitorStatus: ClipboardMonitorStatus | null;
   isLoading: boolean;
 
   // Actions
@@ -76,6 +86,9 @@ interface AppContextValue {
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   resetSettings: () => Promise<void>;
   toggleMonitoring: () => Promise<void>;
+  setMonitoringEnabled: (enabled: boolean) => Promise<void>;
+  refreshClipboardStatus: () => Promise<void>;
+  captureClipboardNow: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -100,6 +113,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [regionCaptureSource, setRegionCaptureSource] = useState<ScreenshotEntry | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
+  const [clipboardDiagnostics, setClipboardDiagnostics] =
+    useState<ClipboardDiagnostics | null>(null);
+  const [monitorStatus, setMonitorStatus] = useState<ClipboardMonitorStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const didApplyDefaultView = useRef(false);
 
@@ -130,9 +146,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsLoading(false);
   }, [showError]);
 
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+  const refreshClipboardStatus = useCallback(async () => {
+    const [diagnostics, status] = await Promise.allSettled([
+      clipboardService.getDiagnostics(),
+      clipboardService.getMonitorStatus(),
+    ]);
+
+    if (diagnostics.status === 'fulfilled') setClipboardDiagnostics(diagnostics.value);
+    else console.error('[LucidClip] Failed to load clipboard diagnostics', diagnostics.reason);
+
+    if (status.status === 'fulfilled') setMonitorStatus(status.value);
+    else console.error('[LucidClip] Failed to load monitor status', status.reason);
+  }, []);
 
   useEffect(() => {
     if (isLoading || didApplyDefaultView.current) return;
@@ -141,45 +166,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isLoading, settings.general.defaultView]);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauri()) {
+      void refreshData();
+      void refreshClipboardStatus();
+      return;
+    }
 
-    let unlisten: (() => void) | undefined;
     let cancelled = false;
+    const disposers: Array<() => void> = [];
 
-    listen<DbClipboardDto>('clipboard://new-entry', (event) => {
-      const entry = mapClipboardDtoToEntry(event.payload);
-      setClipboardItems((previous) => [
-        entry,
-        ...previous.filter((item) => item.id !== entry.id),
-      ]);
-      setSelectedItem((previous) =>
-        previous?.kind === 'clipboard' && previous.id === entry.id
-          ? { kind: 'clipboard', ...entry }
-          : previous
-      );
-      void storageService
-        .getStorageUsage()
-        .then(setStorageStats)
-        .catch((err) =>
-          console.error('[LucidClip] Failed to refresh storage after capture', err)
-        );
-    })
-      .then((dispose) => {
-        if (cancelled) {
-          dispose();
-        } else {
-          unlisten = dispose;
+    const setup = async () => {
+      const disposeCapture = await listen<unknown>(CLIPBOARD_EVENT_NAME, (event) => {
+        const dto: DbClipboardDto | null = validateClipboardEventPayload(event.payload);
+        if (!dto) {
+          console.warn('[LucidClip] Ignored malformed clipboard event payload');
+          return;
         }
-      })
-      .catch((err) => {
-        console.error('[LucidClip] Failed to subscribe to clipboard events', err);
+
+        const entry = mapClipboardDtoToEntry(dto);
+        setClipboardItems((previous) => mergeClipboardEntry(previous, entry));
+        setSelectedItem((previous) =>
+          previous?.kind === 'clipboard' && previous.id === entry.id
+            ? { kind: 'clipboard', ...entry }
+            : previous
+        );
+        void storageService
+          .getStorageUsage()
+          .then(setStorageStats)
+          .catch((err) =>
+            console.error('[LucidClip] Failed to refresh storage after capture', err)
+          );
+        void refreshClipboardStatus();
       });
+
+      const disposeStatus = await listen<ClipboardMonitorStatus>(
+        CLIPBOARD_STATUS_EVENT_NAME,
+        (event) => setMonitorStatus(event.payload)
+      );
+
+      if (cancelled) {
+        disposeCapture();
+        disposeStatus();
+        return;
+      }
+
+      disposers.push(disposeCapture, disposeStatus);
+      await refreshData();
+      await refreshClipboardStatus();
+    };
+
+    void setup().catch((err) => {
+      console.error('[LucidClip] Failed to subscribe to clipboard events', err);
+    });
 
     return () => {
       cancelled = true;
-      unlisten?.();
+      disposers.forEach((dispose) => dispose());
     };
-  }, [refreshData]);
+  }, [refreshData, refreshClipboardStatus]);
 
   const togglePreview = () => setIsPreviewVisible((prev) => !prev);
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
@@ -387,17 +431,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const toggleMonitoring = async () => {
-    const nextState = !settings.clipboard.monitoringEnabled;
+  const setMonitoringEnabled = async (enabled: boolean) => {
     try {
-      const updated = await settingsService.updateSettings({
-        clipboard: { ...settings.clipboard, monitoringEnabled: nextState },
-        privacy: { ...settings.privacy, pauseMonitoring: !nextState },
-      });
-      setSettings(updated);
-      toast.info(nextState ? 'Monitoring active.' : 'Monitoring paused.');
+      const status = await clipboardService.setMonitoringEnabled(enabled);
+      setMonitorStatus(status);
+
+      if (isTauri()) {
+        setSettings((previous) => ({
+          ...previous,
+          clipboard: { ...previous.clipboard, monitoringEnabled: enabled },
+          privacy: { ...previous.privacy, pauseMonitoring: !enabled },
+        }));
+      } else {
+        const updated = await settingsService.updateSettings({
+          clipboard: { ...settings.clipboard, monitoringEnabled: enabled },
+          privacy: { ...settings.privacy, pauseMonitoring: !enabled },
+        });
+        setSettings(updated);
+      }
+
+      toast.info(enabled ? 'Monitoring active.' : 'Monitoring paused.');
     } catch (err) {
       reportActionError('Monitoring update', err);
+    }
+  };
+
+  const toggleMonitoring = async () => {
+    const isCurrentlyEnabled = monitorStatus
+      ? monitorStatus.running && !monitorStatus.paused
+      : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+    await setMonitoringEnabled(!isCurrentlyEnabled);
+  };
+
+  const captureClipboardNow = async () => {
+    try {
+      const entry = await clipboardService.captureNow();
+      if (entry) {
+        setClipboardItems((previous) => mergeClipboardEntry(previous, entry));
+        setSelectedItem({ kind: 'clipboard', ...entry });
+        toast.success('Clipboard captured.');
+      } else {
+        toast.info('Nothing new to capture right now.');
+      }
+      await refreshClipboardStatus();
+    } catch (err) {
+      reportActionError('Capture clipboard', err);
     }
   };
 
@@ -434,6 +512,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unifiedHistory,
         settings,
         storageStats,
+        clipboardDiagnostics,
+        monitorStatus,
         isLoading,
         refreshData,
         copyItem,
@@ -449,6 +529,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSettings,
         resetSettings,
         toggleMonitoring,
+        setMonitoringEnabled,
+        refreshClipboardStatus,
+        captureClipboardNow,
       }}
     >
       {children}

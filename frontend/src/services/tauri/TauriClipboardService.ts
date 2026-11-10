@@ -2,7 +2,12 @@
 
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { IClipboardService } from '../contracts';
-import { ClipboardContentType, ClipboardEntry } from '@/types';
+import {
+  ClipboardContentType,
+  ClipboardDiagnostics,
+  ClipboardEntry,
+  ClipboardMonitorStatus,
+} from '@/types';
 
 export interface DbClipboardDto {
   id: string;
@@ -106,5 +111,22 @@ export class TauriClipboardService implements IClipboardService {
       sourceApp,
     });
     return mapDtoToEntry(dto);
+  }
+
+  async getDiagnostics(): Promise<ClipboardDiagnostics> {
+    return await invoke<ClipboardDiagnostics>('get_clipboard_diagnostics');
+  }
+
+  async getMonitorStatus(): Promise<ClipboardMonitorStatus> {
+    return await invoke<ClipboardMonitorStatus>('get_monitor_status');
+  }
+
+  async setMonitoringEnabled(enabled: boolean): Promise<ClipboardMonitorStatus> {
+    return await invoke<ClipboardMonitorStatus>('set_monitoring_enabled', { enabled });
+  }
+
+  async captureNow(): Promise<ClipboardEntry | null> {
+    const dto = await invoke<DbClipboardDto | null>('capture_clipboard_now');
+    return dto ? mapDtoToEntry(dto) : null;
   }
 }

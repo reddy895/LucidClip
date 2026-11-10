@@ -1,5 +1,9 @@
 import { IClipboardService } from '../contracts';
-import { ClipboardEntry } from '@/types';
+import {
+  ClipboardDiagnostics,
+  ClipboardEntry,
+  ClipboardMonitorStatus,
+} from '@/types';
 import { copyTextToClipboard, detectContentType } from '@/utils';
 
 const STORAGE_KEY = 'lucidclip_clipboard_history';
@@ -7,6 +11,7 @@ const STORAGE_KEY = 'lucidclip_clipboard_history';
 export class MockClipboardService implements IClipboardService {
   private entries: ClipboardEntry[] = [];
   private isLoaded = false;
+  private monitoringEnabled = true;
 
   private load(): ClipboardEntry[] {
     if (this.isLoaded) return this.entries;
@@ -141,6 +146,49 @@ export class MockClipboardService implements IClipboardService {
     this.entries = [newEntry, ...list];
     this.save();
     return Promise.resolve(newEntry);
+  }
+
+  async getDiagnostics(): Promise<ClipboardDiagnostics> {
+    return Promise.resolve({
+      os: 'browser',
+      session: 'unsupported',
+      session_type: null,
+      wayland_display: null,
+      display: null,
+      desktop: null,
+      backend: 'mock',
+      monitoring_supported: false,
+      supports_text: false,
+      supports_images: false,
+      supports_files: false,
+      utilities: { wl_paste: false, wl_copy: false, xclip: false, xsel: false },
+      diagnostics: [
+        'Browser preview mode: native clipboard monitoring is only available in the desktop app.',
+      ],
+    });
+  }
+
+  async getMonitorStatus(): Promise<ClipboardMonitorStatus> {
+    return Promise.resolve({
+      supported: false,
+      running: false,
+      paused: !this.monitoringEnabled,
+      backend: 'mock',
+      session: 'unsupported',
+      captures: 0,
+      last_capture_at: null,
+      last_error: null,
+      started_at: null,
+    });
+  }
+
+  async setMonitoringEnabled(enabled: boolean): Promise<ClipboardMonitorStatus> {
+    this.monitoringEnabled = enabled;
+    return this.getMonitorStatus();
+  }
+
+  async captureNow(): Promise<ClipboardEntry | null> {
+    return Promise.resolve(null);
   }
 }
 

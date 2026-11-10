@@ -1,4 +1,4 @@
-import { ClipboardEntry } from '@/types';
+import { ClipboardDiagnostics, ClipboardEntry, ClipboardMonitorStatus } from '@/types';
 
 export interface IClipboardService {
   getHistory(): Promise<ClipboardEntry[]>;
@@ -10,5 +10,8 @@ export interface IClipboardService {
   deleteEntry(id: string): Promise<boolean>;
   clearHistory(): Promise<void>;
   addEntry(content: string, sourceApp?: string): Promise<ClipboardEntry>;
+  getDiagnostics(): Promise<ClipboardDiagnostics>;
+  getMonitorStatus(): Promise<ClipboardMonitorStatus>;
+  setMonitoringEnabled(enabled: boolean): Promise<ClipboardMonitorStatus>;
+  captureNow(): Promise<ClipboardEntry | null>;
 }
-

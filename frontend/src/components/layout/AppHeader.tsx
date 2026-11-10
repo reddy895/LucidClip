@@ -14,6 +14,7 @@ import { Tooltip } from '@/components/ui';
 export const AppHeader: React.FC = () => {
   const {
     settings,
+    monitorStatus,
     toggleMonitoring,
     openQuickAccess,
     isPreviewVisible,
@@ -22,7 +23,10 @@ export const AppHeader: React.FC = () => {
     toggleSidebar,
   } = useApp();
 
-  const isMonitoring = settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+  const isMonitoring = monitorStatus
+    ? monitorStatus.running && !monitorStatus.paused
+    : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+  const monitoringUnsupported = monitorStatus ? !monitorStatus.supported : false;
 
   return (
     <header className="flex h-11 w-full items-center justify-between border-b border-graphite-border bg-graphite-sidebar px-3 select-none shrink-0 z-20">
@@ -74,14 +78,27 @@ export const AppHeader: React.FC = () => {
       <div className="flex items-center gap-1.5">
         {/* Monitoring status indicator button */}
         <Tooltip
-          content={isMonitoring ? 'Monitoring Active (Click to pause)' : 'Monitoring Paused (Click to resume)'}
+          content={
+            monitoringUnsupported
+              ? 'Clipboard monitoring is unavailable in this session'
+              : isMonitoring
+                ? 'Monitoring Active (Click to pause)'
+                : 'Monitoring Paused (Click to resume)'
+          }
         >
           <button
             type="button"
             onClick={toggleMonitoring}
-            className="flex h-7 items-center gap-1.5 rounded-btn px-2 text-[11px] font-medium transition-colors border border-transparent hover:border-graphite-border"
+            disabled={monitoringUnsupported}
+            className="flex h-7 items-center gap-1.5 rounded-btn px-2 text-[11px] font-medium transition-colors border border-transparent hover:border-graphite-border disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isMonitoring ? (
+            {monitoringUnsupported ? (
+              <>
+                <ShieldAlert className="h-3.5 w-3.5 text-status-error" />
+                <span className="hidden md:inline text-status-error">Unavailable</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-status-error" />
+              </>
+            ) : isMonitoring ? (
               <>
                 <ShieldCheck className="h-3.5 w-3.5 text-status-success" />
                 <span className="hidden md:inline text-graphite-text-secondary">Monitoring</span>

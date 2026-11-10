@@ -4,25 +4,47 @@ import { formatBytes } from '@/utils';
 import { ShieldCheck, ShieldAlert, Database } from 'lucide-react';
 
 export const AppFooter: React.FC = () => {
-  const { settings, storageStats, unifiedHistory, selectedItem } = useApp();
+  const {
+    settings,
+    monitorStatus,
+    clipboardDiagnostics,
+    storageStats,
+    unifiedHistory,
+    selectedItem,
+  } = useApp();
 
-  const isMonitoring = settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+  const monitoringUnsupported = monitorStatus ? !monitorStatus.supported : false;
+  const isMonitoring = monitorStatus
+    ? monitorStatus.running && !monitorStatus.paused
+    : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
+  const monitorLabel = monitoringUnsupported
+    ? 'Monitoring Unavailable'
+    : isMonitoring
+      ? 'Monitoring Active'
+      : 'Monitoring Paused';
   const dbBytes = storageStats?.dbSizeBytes ?? 0;
 
   return (
     <footer className="flex h-6 w-full items-center justify-between border-t border-graphite-border bg-graphite-sidebar px-3 text-[11px] text-graphite-text-muted select-none shrink-0 z-10">
       {/* Left: Monitoring status */}
       <div className="flex items-center gap-1.5">
-        {isMonitoring ? (
+        {monitoringUnsupported ? (
+          <>
+            <ShieldAlert className="h-3 w-3 text-status-error" />
+            <span className="text-status-error">{monitorLabel}</span>
+          </>
+        ) : isMonitoring ? (
           <>
             <ShieldCheck className="h-3 w-3 text-status-success" />
-            <span className="text-graphite-text-secondary">Monitoring Active</span>
-            <span className="hidden sm:inline text-graphite-text-muted">• Native clipboard monitor</span>
+            <span className="text-graphite-text-secondary">{monitorLabel}</span>
+            <span className="hidden sm:inline text-graphite-text-muted">
+              • {clipboardDiagnostics?.backend ?? 'Native'} clipboard monitor
+            </span>
           </>
         ) : (
           <>
             <ShieldAlert className="h-3 w-3 text-status-warning" />
-            <span className="text-status-warning">Monitoring Paused</span>
+            <span className="text-status-warning">{monitorLabel}</span>
           </>
         )}
       </div>

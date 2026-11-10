@@ -22,6 +22,9 @@ import {
   Plus,
   X,
   CheckCircle2,
+  Activity,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/utils';
 
@@ -33,12 +36,24 @@ export const SettingsView: React.FC = () => {
     updateSettings,
     resetSettings,
     clearClipboardHistory,
+    clipboardDiagnostics,
+    monitorStatus,
+    setMonitoringEnabled,
+    refreshClipboardStatus,
+    captureClipboardNow,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [newExclusionApp, setNewExclusionApp] = useState('');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isClearDataModalOpen, setIsClearDataModalOpen] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const monitoringSupported =
+    monitorStatus?.supported ?? clipboardDiagnostics?.monitoring_supported ?? true;
+  const monitoringActive = monitorStatus
+    ? monitorStatus.running && !monitorStatus.paused
+    : settings.clipboard.monitoringEnabled && !settings.privacy.pauseMonitoring;
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: 'General', icon: <Sliders className="h-4 w-4" /> },
@@ -203,27 +218,127 @@ export const SettingsView: React.FC = () => {
               >
                 <div className="flex items-center justify-between py-1">
                   <div>
-                    <div className="text-xs font-medium text-graphite-text-primary">
+                    <div className="flex items-center gap-2 text-xs font-medium text-graphite-text-primary">
                       Enable clipboard monitoring
+                      <Badge
+                        variant={
+                          !monitoringSupported
+                            ? 'error'
+                            : monitoringActive
+                              ? 'success'
+                              : 'warning'
+                        }
+                        size="sm"
+                      >
+                        {!monitoringSupported
+                          ? 'Unsupported'
+                          : monitoringActive
+                            ? 'Active'
+                            : 'Paused'}
+                      </Badge>
                     </div>
                     <div className="text-[11px] text-graphite-text-muted">
                       Automatically store supported text, code, and links copied to the clipboard.
                     </div>
                   </div>
                   <Toggle
-                    checked={settings.clipboard.monitoringEnabled}
-                    onChange={(checked) =>
-                      updateSettings({
-                        clipboard: { ...settings.clipboard, monitoringEnabled: checked },
-                      })
-                    }
+                    checked={monitoringActive}
+                    disabled={!monitoringSupported}
+                    onChange={(checked) => setMonitoringEnabled(checked)}
+                    aria-label="Enable clipboard monitoring"
                   />
                 </div>
+
+                {!monitoringSupported && (
+                  <div className="flex items-start gap-2 rounded-btn border border-status-error/30 bg-status-error-bg p-3 text-[11px] text-status-error">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      This environment has no usable clipboard backend. The desktop app needs a
+                      Windows session with access to the clipboard API, or a Linux session with a
+                      GTK clipboard provider.
+                    </span>
+                  </div>
+                )}
 
                 <div className="rounded-btn border border-graphite-border bg-graphite-surface p-3 text-[11px] text-graphite-text-muted">
                   Copying identical text again refreshes its timestamp instead of creating a
                   duplicate history row.
                 </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Backend Diagnostics"
+                description="Local, content-free information about the active clipboard integration."
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<RefreshCw className="h-3.5 w-3.5" />}
+                    onClick={() => void refreshClipboardStatus()}
+                  >
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Activity className="h-3.5 w-3.5" />}
+                    isLoading={isCapturing}
+                    disabled={!monitoringSupported}
+                    onClick={async () => {
+                      setIsCapturing(true);
+                      try {
+                        await captureClipboardNow();
+                      } finally {
+                        setIsCapturing(false);
+                      }
+                    }}
+                  >
+                    Capture now
+                  </Button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    ['Backend', clipboardDiagnostics?.backend ?? monitorStatus?.backend ?? 'Unknown'],
+                    ['Session', clipboardDiagnostics?.session ?? monitorStatus?.session ?? 'Unknown'],
+                    ['Desktop', clipboardDiagnostics?.desktop ?? 'Unknown'],
+                    ['Captures', monitorStatus ? String(monitorStatus.captures) : '0'],
+                    [
+                      'Text',
+                      clipboardDiagnostics?.supports_text ? 'Supported' : 'Not supported',
+                    ],
+                    [
+                      'Images',
+                      clipboardDiagnostics?.supports_images ? 'Supported' : 'Not supported',
+                    ],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between rounded-btn border border-graphite-border bg-graphite-surface px-2.5 py-1.5 text-[11px]"
+                    >
+                      <span className="text-graphite-text-muted">{label}</span>
+                      <span className="font-mono text-graphite-text-secondary">{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {monitorStatus?.last_error && (
+                  <div className="rounded-btn border border-status-error/30 bg-status-error-bg p-3 text-[11px] text-status-error">
+                    Last monitor error: {monitorStatus.last_error}
+                  </div>
+                )}
+
+                {clipboardDiagnostics && clipboardDiagnostics.diagnostics.length > 0 && (
+                  <ul className="flex flex-col gap-1 text-[11px] text-graphite-text-muted">
+                    {clipboardDiagnostics.diagnostics.map((line) => (
+                      <li key={line} className="flex items-start gap-1.5">
+                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-graphite-text-muted" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </SettingsSection>
 
               <SettingsSection
