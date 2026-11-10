@@ -110,6 +110,91 @@ pub fn clear_clipboard_history(state: tauri::State<'_, AppState>) -> Result<usiz
     service.clear_unpinned()
 }
 
+/// Describe the detected clipboard backend, session, and diagnostics.
+#[tauri::command]
+pub fn get_clipboard_diagnostics() -> crate::platform::ClipboardEnvironment {
+    crate::platform::clipboard_environment()
+}
+
+/// Return the current monitor lifecycle and error state.
+#[tauri::command]
+pub fn get_monitor_status(state: tauri::State<'_, AppState>) -> crate::clipboard::MonitorStatus {
+    crate::clipboard::status_snapshot(&state.monitor_status)
+}
+
+/// Persist the monitoring preference and report the resulting status.
+///
+/// The monitor re-reads persisted settings on its next tick, so pausing takes
+/// effect for any clipboard change after this command returns.
+#[tauri::command]
+pub fn set_monitoring_enabled(
+    enabled: bool,
+    state: tauri::State<'_, AppState>,
+) -> Result<crate::clipboard::MonitorStatus> {
+    let repo = SettingsRepo::new(&state.pool);
+    let mut settings = repo
+        .get("app_settings")?
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !settings.is_object() {
+        settings = serde_json::json!({});
+    }
+
+    let object = settings
+        .as_object_mut()
+        .ok_or_else(|| AppError::Settings("Stored settings are not an object".into()))?;
+
+    {
+        let clipboard = object
+            .entry("clipboard")
+            .or_insert_with(|| serde_json::json!({}));
+        if !clipboard.is_object() {
+            *clipboard = serde_json::json!({});
+        }
+        clipboard
+            .as_object_mut()
+            .expect("clipboard settings replaced with an object")
+            .insert(
+                "monitoringEnabled".to_string(),
+                serde_json::Value::Bool(enabled),
+            );
+    }
+
+    {
+        let privacy = object
+            .entry("privacy")
+            .or_insert_with(|| serde_json::json!({}));
+        if !privacy.is_object() {
+            *privacy = serde_json::json!({});
+        }
+        privacy
+            .as_object_mut()
+            .expect("privacy settings replaced with an object")
+            .insert(
+                "pauseMonitoring".to_string(),
+                serde_json::Value::Bool(!enabled),
+            );
+    }
+
+    repo.set("app_settings", &settings.to_string())?;
+
+    if let Ok(mut status) = state.monitor_status.lock() {
+        status.paused = !enabled;
+        status.last_error = None;
+    }
+
+    Ok(crate::clipboard::status_snapshot(&state.monitor_status))
+}
+
+/// Capture the current clipboard immediately, respecting pause and exclusions.
+#[tauri::command]
+pub fn capture_clipboard_now(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<DbClipboardEntry>> {
+    crate::clipboard::capture_now(&app, &state.pool, &state.paths, &state.monitor_status)
+}
+
 // ==========================================
 // Screenshot Commands
 // ==========================================

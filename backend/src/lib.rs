@@ -10,10 +10,11 @@ pub mod screenshots;
 pub mod settings;
 pub mod storage;
 
+use crate::clipboard::MonitorStatus;
 use crate::database::{run_migrations, DbPool};
 use crate::storage::AppPaths;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, WindowEvent};
@@ -27,14 +28,21 @@ pub struct AppState {
     pub pool: Arc<DbPool>,
     pub paths: AppPaths,
     pub monitor_stop: Arc<AtomicBool>,
+    pub monitor_status: Arc<Mutex<MonitorStatus>>,
 }
 
 impl AppState {
-    pub fn new(pool: Arc<DbPool>, paths: AppPaths, monitor_stop: Arc<AtomicBool>) -> Self {
+    pub fn new(
+        pool: Arc<DbPool>,
+        paths: AppPaths,
+        monitor_stop: Arc<AtomicBool>,
+        monitor_status: Arc<Mutex<MonitorStatus>>,
+    ) -> Self {
         Self {
             pool,
             paths,
             monitor_stop,
+            monitor_status,
         }
     }
 }
@@ -171,11 +179,23 @@ pub fn run() {
             }
 
             let monitor_stop = Arc::new(AtomicBool::new(false));
+            let monitor_status = Arc::new(Mutex::new(clipboard::initial_status()));
             let monitor_paths = paths.clone();
-            let state = AppState::new(pool.clone(), paths, monitor_stop.clone());
+            let state = AppState::new(
+                pool.clone(),
+                paths,
+                monitor_stop.clone(),
+                monitor_status.clone(),
+            );
             app.manage(state);
 
-            clipboard::spawn_monitor(app.handle().clone(), pool, monitor_paths, monitor_stop);
+            clipboard::spawn_monitor(
+                app.handle().clone(),
+                pool,
+                monitor_paths,
+                monitor_stop,
+                monitor_status,
+            );
 
             match setup_tray_icon(app.handle()) {
                 Ok(()) => hide_on_close(app.handle()),
@@ -208,7 +228,11 @@ pub fn run() {
             commands::toggle_screenshot_favorite,
             commands::get_settings,
             commands::update_setting,
-            commands::get_storage_stats
+            commands::get_storage_stats,
+            commands::get_clipboard_diagnostics,
+            commands::get_monitor_status,
+            commands::set_monitoring_enabled,
+            commands::capture_clipboard_now
         ])
         .build(tauri::generate_context!())
         .expect("error while building LucidClip desktop application");

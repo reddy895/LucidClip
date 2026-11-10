@@ -1,6 +1,7 @@
 //! Clipboard Processing and Storage Engine
 
 pub mod classifier;
+pub mod events;
 pub mod hasher;
 pub mod media;
 pub mod monitor;
@@ -8,8 +9,14 @@ pub mod normalize;
 pub mod service;
 
 pub use classifier::{classify_content, ClipboardContentType};
+pub use events::{
+    ClipboardCapturedEvent, CLIPBOARD_CAPTURED_EVENT, CLIPBOARD_EVENT_VERSION,
+    CLIPBOARD_STATUS_EVENT,
+};
 pub use hasher::hash_content;
-pub use monitor::{spawn as spawn_monitor, CLIPBOARD_CAPTURED_EVENT};
+pub use monitor::{
+    capture_now, initial_status, spawn as spawn_monitor, status_snapshot, MonitorStatus,
+};
 pub use normalize::{canonical_text, normalize_text};
 pub use service::ClipboardService;
 

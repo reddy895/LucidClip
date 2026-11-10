@@ -6,20 +6,23 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use chrono::Utc;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+use crate::clipboard::events::{
+    ClipboardCapturedEvent, CLIPBOARD_CAPTURED_EVENT, CLIPBOARD_STATUS_EVENT,
+};
 use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
-use crate::database::{DbPool, SettingsRepo};
+use crate::database::{DbClipboardEntry, DbPool, SettingsRepo};
+use crate::errors::{AppError, Result};
 use crate::platform::{self, ClipboardSnapshot};
 use crate::storage::AppPaths;
-
-/// Event emitted whenever the monitor persists a new clipboard entry.
-pub const CLIPBOARD_CAPTURED_EVENT: &str = "clipboard://new-entry";
 
 /// Fallback sampling interval when native change notifications are unavailable.
 /// Deliberately conservative so an unsupported host never spins the CPU.
@@ -35,6 +38,57 @@ const SAFETY_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Guard against pathological clipboard payloads freezing the UI or database.
 const MAX_CAPTURE_CHARS: usize = 1_000_000;
+
+/// Observable monitor state shared with the Tauri command layer.
+///
+/// Errors never include clipboard content; they describe the failing operation
+/// only. The UI uses this to avoid claiming monitoring is active after failure.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct MonitorStatus {
+    pub supported: bool,
+    pub running: bool,
+    pub paused: bool,
+    pub backend: String,
+    pub session: String,
+    pub captures: u64,
+    pub last_capture_at: Option<i64>,
+    pub last_error: Option<String>,
+    pub started_at: Option<i64>,
+}
+
+pub fn initial_status() -> MonitorStatus {
+    let environment = platform::clipboard_environment();
+    MonitorStatus {
+        supported: environment.monitoring_supported,
+        running: false,
+        paused: false,
+        backend: environment.backend,
+        session: environment.session.as_str().to_string(),
+        captures: 0,
+        last_capture_at: None,
+        last_error: None,
+        started_at: None,
+    }
+}
+
+pub fn status_snapshot(status: &Arc<Mutex<MonitorStatus>>) -> MonitorStatus {
+    status
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_else(|_| initial_status())
+}
+
+fn update_status(status: &Arc<Mutex<MonitorStatus>>, update: impl FnOnce(&mut MonitorStatus)) {
+    if let Ok(mut guard) = status.lock() {
+        update(&mut guard);
+    }
+}
+
+fn emit_status(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>) {
+    if let Err(err) = app.emit(CLIPBOARD_STATUS_EVENT, status_snapshot(status)) {
+        eprintln!("[LucidClip Monitor] Failed to notify frontend about monitor status: {err}");
+    }
+}
 
 #[derive(Debug)]
 struct MonitorPolicy {
@@ -122,20 +176,35 @@ fn is_excluded_process(policy: &MonitorPolicy, process: Option<&str>) -> bool {
         .any(|excluded| excluded.eq_ignore_ascii_case(process))
 }
 
-/// Start the clipboard monitor thread.
-///
-/// The thread exits when `stop` is set to `true` during application shutdown.
+/// Tracks the last successfully persisted fingerprint so repeated safety polls
+/// do not re-emit the same clipboard value.
 struct CaptureState {
     last_hash: Option<String>,
 }
 
+impl CaptureState {
+    fn new() -> Self {
+        Self { last_hash: None }
+    }
+}
+
+fn fail(status: &Arc<Mutex<MonitorStatus>>, message: String) {
+    eprintln!("[LucidClip Monitor] {message}");
+    update_status(status, |state| state.last_error = Some(message));
+}
+
+/// Read the clipboard once and persist a supported value.
+///
+/// Returns the persisted (or refreshed) entry when a capture happened. All
+/// errors are recorded in the shared status without logging clipboard content.
 fn capture_clipboard_once(
     app: &AppHandle,
     pool: &DbPool,
     paths: &AppPaths,
     policy: &MonitorPolicy,
     state: &mut CaptureState,
-) {
+    status: &Arc<Mutex<MonitorStatus>>,
+) -> Option<DbClipboardEntry> {
     let foreground = match platform::foreground_process_name() {
         Ok(name) => name,
         Err(err) => {
@@ -145,18 +214,19 @@ fn capture_clipboard_once(
     };
 
     if is_excluded_process(policy, foreground.as_deref()) {
-        return;
+        return None;
     }
 
     if policy.exclude_sensitive {
         match platform::clipboard_content_is_sensitive() {
-            Ok(true) => return,
+            Ok(true) => return None,
             Ok(false) => {}
             Err(err) => {
-                eprintln!(
-                    "[LucidClip Monitor] Sensitive-content check failed; skipping tick: {err}"
+                fail(
+                    status,
+                    format!("Sensitive-content check failed; skipping tick: {err}"),
                 );
-                return;
+                return None;
             }
         }
     }
@@ -167,29 +237,31 @@ fn capture_clipboard_once(
                 eprintln!(
                     "[LucidClip Monitor] Skipped clipboard content larger than {MAX_CAPTURE_CHARS} characters."
                 );
-                return;
+                return None;
             }
 
             let hash = hash_content(&text);
             if state.last_hash.as_deref() == Some(hash.as_str()) {
-                return;
+                return None;
             }
 
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_text(&text, foreground) {
-                Ok(entry) => record_capture(app, state, entry),
-                Err(err) => {
-                    eprintln!("[LucidClip Monitor] Failed to persist clipboard text: {err}");
+                Ok(entry) => {
+                    record_capture(app, state, status, &entry);
+                    return Some(entry);
                 }
+                Err(err) => fail(status, format!("Failed to persist clipboard text: {err}")),
             }
         }
         Ok(Some(ClipboardSnapshot::Image(image))) => {
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_image(image, foreground) {
-                Ok(entry) => record_capture(app, state, entry),
-                Err(err) => {
-                    eprintln!("[LucidClip Monitor] Failed to persist clipboard image: {err}");
+                Ok(entry) => {
+                    record_capture(app, state, status, &entry);
+                    return Some(entry);
                 }
+                Err(err) => fail(status, format!("Failed to persist clipboard image: {err}")),
             }
         }
         Ok(Some(ClipboardSnapshot::Files(files))) => {
@@ -197,15 +269,16 @@ fn capture_clipboard_once(
                 eprintln!(
                     "[LucidClip Monitor] Skipped file list larger than {MAX_CAPTURE_CHARS} characters."
                 );
-                return;
+                return None;
             }
 
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_files(files, foreground) {
-                Ok(entry) => record_capture(app, state, entry),
-                Err(err) => {
-                    eprintln!("[LucidClip Monitor] Failed to persist clipboard files: {err}");
+                Ok(entry) => {
+                    record_capture(app, state, status, &entry);
+                    return Some(entry);
                 }
+                Err(err) => fail(status, format!("Failed to persist clipboard files: {err}")),
             }
         }
         Ok(_) => {
@@ -215,25 +288,52 @@ fn capture_clipboard_once(
         }
         Err(err) => {
             // Clipboard contention is expected; retry on the next tick.
-            eprintln!("[LucidClip Monitor] Clipboard read skipped: {err}");
+            fail(status, format!("Clipboard read skipped: {err}"));
         }
     }
+
+    None
 }
 
 fn record_capture(
     app: &AppHandle,
     state: &mut CaptureState,
-    entry: crate::database::DbClipboardEntry,
+    status: &Arc<Mutex<MonitorStatus>>,
+    entry: &DbClipboardEntry,
 ) {
     state.last_hash = Some(entry.content_hash.clone());
-    if let Err(err) = app.emit(CLIPBOARD_CAPTURED_EVENT, &entry) {
+
+    let now = Utc::now().timestamp_millis();
+    update_status(status, |state| {
+        state.captures = state.captures.saturating_add(1);
+        state.last_capture_at = Some(now);
+        state.last_error = None;
+    });
+
+    let payload = ClipboardCapturedEvent::new(entry.clone());
+    if let Err(err) = app.emit(CLIPBOARD_CAPTURED_EVENT, &payload) {
         eprintln!("[LucidClip Monitor] Failed to notify frontend: {err}");
+        update_status(status, |state| {
+            state.last_error = Some(format!("Failed to notify frontend: {err}"));
+        });
     }
+    emit_status(app, status);
 }
 
-fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<AtomicBool>) {
+fn run_monitor(
+    app: AppHandle,
+    pool: Arc<DbPool>,
+    paths: AppPaths,
+    stop: Arc<AtomicBool>,
+    status: Arc<Mutex<MonitorStatus>>,
+) {
     println!("[LucidClip Monitor] Clipboard monitor started.");
-    let mut state = CaptureState { last_hash: None };
+    let mut state = CaptureState::new();
+
+    update_status(&status, |state| {
+        state.running = true;
+        state.started_at = Some(Utc::now().timestamp_millis());
+    });
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     let native_notifications = {
@@ -265,9 +365,11 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
 
     // Capture the current clipboard once at startup.
     let policy = monitor_policy(&pool);
+    update_status(&status, |state| state.paused = !policy.enabled);
     if policy.enabled {
-        capture_clipboard_once(&app, &pool, &paths, &policy, &mut state);
+        capture_clipboard_once(&app, &pool, &paths, &policy, &mut state, &status);
     }
+    emit_status(&app, &status);
 
     while !stop.load(Ordering::Relaxed) {
         let wait_result = match &native_notifications {
@@ -293,8 +395,10 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
         }
 
         let policy = monitor_policy(&pool);
+        let was_paused = !policy.enabled;
+        update_status(&status, |state| state.paused = was_paused);
         if policy.enabled {
-            capture_clipboard_once(&app, &pool, &paths, &policy, &mut state);
+            capture_clipboard_once(&app, &pool, &paths, &policy, &mut state, &status);
         } else {
             // Forget the last fingerprint so resuming captures the current
             // clipboard again instead of silently treating it as a duplicate.
@@ -302,10 +406,41 @@ fn run_monitor(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Ato
         }
     }
 
+    update_status(&status, |state| state.running = false);
+    emit_status(&app, &status);
     println!("[LucidClip Monitor] Clipboard monitor stopped.");
 }
 
-pub fn spawn(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<AtomicBool>) {
+/// Capture the clipboard immediately on explicit user request.
+///
+/// This respects the pause setting and never bypasses exclusions.
+pub fn capture_now(
+    app: &AppHandle,
+    pool: &DbPool,
+    paths: &AppPaths,
+    status: &Arc<Mutex<MonitorStatus>>,
+) -> Result<Option<DbClipboardEntry>> {
+    let policy = monitor_policy(pool);
+    if !policy.enabled {
+        return Err(AppError::Clipboard(
+            "Clipboard monitoring is paused; resume it before capturing".into(),
+        ));
+    }
+
+    update_status(status, |state| state.paused = false);
+    let mut state = CaptureState::new();
+    Ok(capture_clipboard_once(
+        app, pool, paths, &policy, &mut state, status,
+    ))
+}
+
+pub fn spawn(
+    app: AppHandle,
+    pool: Arc<DbPool>,
+    paths: AppPaths,
+    stop: Arc<AtomicBool>,
+    status: Arc<Mutex<MonitorStatus>>,
+) {
     if !platform::clipboard_monitoring_supported() {
         let environment = platform::clipboard_environment();
         eprintln!(
@@ -313,18 +448,34 @@ pub fn spawn(app: AppHandle, pool: Arc<DbPool>, paths: AppPaths, stop: Arc<Atomi
             environment.backend,
             environment.session.as_str()
         );
+        let mut first = None;
         for diagnostic in environment.diagnostics {
             eprintln!("[LucidClip Monitor] {diagnostic}");
+            if first.is_none() {
+                first = Some(diagnostic);
+            }
         }
+
+        update_status(&status, |state| {
+            state.supported = false;
+            state.running = false;
+            state.last_error = first;
+        });
+        emit_status(&app, &status);
         return;
     }
 
+    let thread_status = status.clone();
     let spawned = thread::Builder::new()
         .name("lucidclip-clipboard-monitor".into())
-        .spawn(move || run_monitor(app, pool, paths, stop));
+        .spawn(move || run_monitor(app, pool, paths, stop, thread_status));
 
     if let Err(err) = spawned {
         eprintln!("[LucidClip Monitor] Failed to start monitor thread: {err}");
+        update_status(&status, |state| {
+            state.running = false;
+            state.last_error = Some(format!("Failed to start monitor thread: {err}"));
+        });
     }
 }
 
