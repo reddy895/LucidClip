@@ -12,6 +12,15 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { validateProjectLayout } from './check-layout.mjs';
 
+// Development server launcher and port management regression test suites
+import './test/port-detector.test.mjs';
+import './test/process-info.test.mjs';
+import './test/error-reporter.test.mjs';
+import './test/process-cleanup.test.mjs';
+import './test/port-sync.test.mjs';
+import './test/port-conflict-regression.test.mjs';
+import './test/launcher-lifecycle.test.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');

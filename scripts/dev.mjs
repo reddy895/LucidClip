@@ -79,7 +79,7 @@ async function main() {
   // 1. Validate that Vite and Tauri port configurations match
   const portConfig = validatePortConfig();
   if (!portConfig.valid) {
-    fail(`Configuration Error:\n${portConfig.errors.join('\n')}`);
+    fail(`Configuration error.\n${portConfig.errors.join('\n')}`);
   }
 
   // 2. Parse command-line flags
