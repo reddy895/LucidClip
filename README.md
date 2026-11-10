@@ -77,6 +77,9 @@ npm install
 # Launch the Vite frontend and Tauri desktop shell
 npm run dev
 
+# Safe recovery if an earlier session is occupying port 1420
+npm run dev -- --clean
+
 # Frontend-only browser development
 npm run dev:frontend
 
@@ -87,7 +90,7 @@ npm run build
 cd backend && cargo test
 ```
 
-`npm run dev` resolves all paths from the repository root and starts Vite on port `1420`, matching the Tauri `devUrl`.
+`npm run dev` resolves all paths from the repository root and starts Vite on port `1420`, matching the Tauri `devUrl`. Pre-flight port checks prevent orphaned processes and provide detailed PID diagnostics on conflicts. See [docs/DEV_SERVER.md](docs/DEV_SERVER.md) for full process lifecycle and troubleshooting documentation.
 
 On Linux, inspect the native clipboard without launching the desktop shell:
 
@@ -163,7 +166,7 @@ LucidClip/
 ├── frontend/                React + TypeScript + Vite UI
 │   └── src/services/        Typed Tauri and browser adapters
 ├── scripts/                 Launcher and integrity tests
-└── docs/                    Architecture, backend, frontend, and design notes
+└── docs/                    Architecture, dev server, backend, frontend, and design notes
 ```
 
 ---
