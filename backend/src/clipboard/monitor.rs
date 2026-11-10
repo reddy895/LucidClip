@@ -189,9 +189,22 @@ fn set_last_hash(status: &Arc<Mutex<MonitorStatus>>, hash: Option<String>) {
     update_status(status, |state| state.last_hash = hash);
 }
 
-fn fail(status: &Arc<Mutex<MonitorStatus>>, message: String) {
+fn fail(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>, message: String) {
     eprintln!("[LucidClip Monitor] {message}");
-    update_status(status, |state| state.last_error = Some(message));
+    let changed = status
+        .lock()
+        .map(|mut state| {
+            if state.last_error.as_deref() == Some(message.as_str()) {
+                false
+            } else {
+                state.last_error = Some(message);
+                true
+            }
+        })
+        .unwrap_or(false);
+    if changed {
+        emit_status(app, status);
+    }
 }
 
 /// Read the clipboard once and persist a supported value.
@@ -224,6 +237,7 @@ fn capture_clipboard_once(
             Ok(false) => {}
             Err(err) => {
                 fail(
+                    app,
                     status,
                     format!("Sensitive-content check failed; skipping tick: {err}"),
                 );
@@ -252,7 +266,11 @@ fn capture_clipboard_once(
                     record_capture(app, status, &entry);
                     return Some(entry);
                 }
-                Err(err) => fail(status, format!("Failed to persist clipboard text: {err}")),
+                Err(err) => fail(
+                    app,
+                    status,
+                    format!("Failed to persist clipboard text: {err}"),
+                ),
             }
         }
         Ok(Some(ClipboardSnapshot::Image(image))) => {
@@ -262,7 +280,11 @@ fn capture_clipboard_once(
                     record_capture(app, status, &entry);
                     return Some(entry);
                 }
-                Err(err) => fail(status, format!("Failed to persist clipboard image: {err}")),
+                Err(err) => fail(
+                    app,
+                    status,
+                    format!("Failed to persist clipboard image: {err}"),
+                ),
             }
         }
         Ok(Some(ClipboardSnapshot::Files(files))) => {
@@ -279,7 +301,11 @@ fn capture_clipboard_once(
                     record_capture(app, status, &entry);
                     return Some(entry);
                 }
-                Err(err) => fail(status, format!("Failed to persist clipboard files: {err}")),
+                Err(err) => fail(
+                    app,
+                    status,
+                    format!("Failed to persist clipboard files: {err}"),
+                ),
             }
         }
         Ok(_) => {
@@ -289,7 +315,7 @@ fn capture_clipboard_once(
         }
         Err(err) => {
             // Clipboard contention is expected; retry on the next tick.
-            fail(status, format!("Clipboard read skipped: {err}"));
+            fail(app, status, format!("Clipboard read skipped: {err}"));
         }
     }
 
