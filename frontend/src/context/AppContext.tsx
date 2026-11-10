@@ -30,6 +30,7 @@ import {
   CLIPBOARD_EVENT_NAME,
   CLIPBOARD_STATUS_EVENT_NAME,
   mergeClipboardEntry,
+  mergeClipboardHistory,
   validateClipboardEventPayload,
 } from '@/utils/clipboardSync';
 import { useToast } from './ToastContext';
@@ -118,8 +119,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [monitorStatus, setMonitorStatus] = useState<ClipboardMonitorStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const didApplyDefaultView = useRef(false);
+  const clipboardEventVersion = useRef(0);
 
   const refreshData = useCallback(async () => {
+    const clipboardVersionBefore = clipboardEventVersion.current;
     const [clips, shots, currentSettings, stats] = await Promise.allSettled([
       clipboardService.getHistory(),
       screenshotService.getScreenshots(),
@@ -127,8 +130,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storageService.getStorageUsage(),
     ]);
 
-    if (clips.status === 'fulfilled') setClipboardItems(clips.value);
-    else console.error('[LucidClip] Failed to load clipboard history', clips.reason);
+    if (clips.status === 'fulfilled') {
+      const fetched = clips.value;
+      setClipboardItems((previous) =>
+        clipboardEventVersion.current === clipboardVersionBefore
+          ? fetched
+          : mergeClipboardHistory(previous, fetched)
+      );
+    } else console.error('[LucidClip] Failed to load clipboard history', clips.reason);
 
     if (shots.status === 'fulfilled') setScreenshotItems(shots.value);
     else console.error('[LucidClip] Failed to load screenshots', shots.reason);
@@ -180,6 +189,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             const entry = mapClipboardDtoToEntry(dto);
+            clipboardEventVersion.current += 1;
             setClipboardItems((previous) => mergeClipboardEntry(previous, entry));
             setSelectedItem((previous) =>
               previous?.kind === 'clipboard' && previous.id === entry.id

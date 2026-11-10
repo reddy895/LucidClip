@@ -20,7 +20,7 @@ use crate::clipboard::events::{
 use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
 use crate::database::{DbClipboardEntry, DbPool, SettingsRepo};
-use crate::errors::Result;
+use crate::errors::{AppError, Result};
 use crate::platform::{self, ClipboardSnapshot};
 use crate::storage::AppPaths;
 
@@ -418,9 +418,17 @@ pub fn capture_now(
     status: &Arc<Mutex<MonitorStatus>>,
 ) -> Result<Option<DbClipboardEntry>> {
     let policy = monitor_policy(pool);
-    Ok(capture_clipboard_once(
-        app, pool, paths, &policy, status, true,
-    ))
+    let previous_error = status_snapshot(status).last_error;
+    let captured = capture_clipboard_once(app, pool, paths, &policy, status, true);
+
+    let current_error = status_snapshot(status).last_error;
+    if let Some(error) = current_error {
+        if previous_error.as_deref() != Some(error.as_str()) {
+            return Err(AppError::Clipboard(error));
+        }
+    }
+
+    Ok(captured)
 }
 
 pub fn spawn(

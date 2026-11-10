@@ -98,6 +98,18 @@ export function sortClipboardEntries(entries: ClipboardEntry[]): ClipboardEntry[
   });
 }
 
+/** Reconcile a fetched history with an in-flight event update. */
+export function mergeClipboardHistory(
+  current: ClipboardEntry[],
+  fetched: ClipboardEntry[]
+): ClipboardEntry[] {
+  const byId = new Map(fetched.map((entry) => [entry.id, entry]));
+  for (const entry of current) {
+    byId.set(entry.id, entry);
+  }
+  return sortClipboardEntries([...byId.values()]);
+}
+
 /** Insert or replace an entry, keep ordering, and optionally cap the list. */
 export function mergeClipboardEntry(
   entries: ClipboardEntry[],

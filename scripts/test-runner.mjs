@@ -283,6 +283,17 @@ describe('LucidClip Core Integrity Verification', () => {
 
     const capped = sync.mergeClipboardEntry([older, newer, sameTimeA], sameTimeB, 2);
     assert.equal(capped.length, 2, 'The configured history cap must be enforced');
+
+    const reconciled = sync.mergeClipboardHistory(
+      [{ ...newer, content: 'event-version' }],
+      [older, newer]
+    );
+    assert.equal(reconciled.length, 2, 'Reconciliation must not duplicate entries');
+    assert.equal(
+      reconciled.find((entry) => entry.id === 'b').content,
+      'event-version',
+      'An in-flight event must win over a stale fetch'
+    );
   });
 
   test('Clipboard IPC surface: diagnostics, monitor status, pause, and manual capture', () => {
