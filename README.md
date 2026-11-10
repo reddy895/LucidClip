@@ -171,7 +171,7 @@ LucidClip/
 ## Limitations
 
 - Windows screenshot, startup, and foreground-app behavior can only be fully verified on Windows.
-- Linux clipboard support is implemented with GTK 3 and was verified on a GNOME Wayland host for native read/write round-trip; other compositors, especially compositors that restrict background clipboard reads, still need testing.
+- Linux clipboard support is implemented with GTK 3 and was verified on a GNOME Wayland host for native read/write round-trip and GTK `owner-change` notification delivery; other compositors, especially compositors that restrict background clipboard reads, still need testing.
 - Linux does not expose foreground application identity to this backend, so per-app exclusions are stored but cannot be enforced. Sensitive detection on Linux is limited to the KDE password-manager hint target.
 - On Windows, bitmap capture accepts uncompressed 16/24/32-bit `CF_DIB` data and file capture accepts wide-character `CF_HDROP` lists.
 - Rich text and HTML clipboard formats are not preserved; their plain-text representation is captured when available.

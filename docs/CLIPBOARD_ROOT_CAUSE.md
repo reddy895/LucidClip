@@ -109,7 +109,8 @@ fix strategy:
 - Text is normalized before hashing and persistence, and history is ordered by
   `created_at DESC, id DESC` with a supporting index.
 - `backend/examples/clipboard_probe.rs` verifies a real GTK read/write
-  round-trip; it reported `round-trip: ok` on the GNOME Wayland host.
+  round-trip and, with `--watch`, the `owner-change` notification path. Both
+  reported `ok` on the GNOME Wayland host.
 - Backend tests and frontend contract tests cover the pure logic and IPC
   surface. End-to-end monitoring on other compositors still requires manual
   verification.
