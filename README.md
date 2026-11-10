@@ -89,6 +89,15 @@ cd backend && cargo test
 
 `npm run dev` resolves all paths from the repository root and starts Vite on port `1420`, matching the Tauri `devUrl`.
 
+On Linux, inspect the native clipboard without launching the desktop shell:
+
+```bash
+cd backend
+cargo run --example clipboard_probe -- --read   # non-destructive capability check
+cargo run --example clipboard_probe             # write/read round-trip (replaces clipboard)
+cargo run --example clipboard_probe -- --watch  # verify GTK owner-change notifications
+```
+
 ---
 
 ## Storage layout
