@@ -3,9 +3,12 @@
 //! Usage:
 //!   cargo run --example clipboard_probe
 //!   cargo run --example clipboard_probe -- --read
+//!   cargo run --example clipboard_probe -- --watch
 //!
 //! The probe never prints clipboard contents. It only reports the backend
-//! environment and whether a round-trip write/read succeeded.
+//! environment and whether a round-trip write/read or a change notification
+//! succeeded. `--watch` writes a marker and waits for the backend to report
+//! an owner change.
 
 use lucidclip_lib::platform;
 
@@ -27,6 +30,11 @@ fn main() {
     );
     for diagnostic in &environment.diagnostics {
         println!("diagnostic: {diagnostic}");
+    }
+
+    if std::env::args().any(|arg| arg == "--watch") {
+        watch_for_change();
+        return;
     }
 
     if std::env::args().any(|arg| arg == "--read") {
@@ -93,6 +101,77 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+fn watch_for_change() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc::{self, TryRecvError};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    let (notify_tx, notify_rx) = mpsc::sync_channel::<()>(1);
+    if let Err(err) = platform::spawn_clipboard_watcher(notify_tx) {
+        eprintln!("clipboard watcher unavailable: {err}");
+        std::process::exit(1);
+    }
+
+    let marker = format!(
+        "LucidClip watch probe {}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_millis())
+            .unwrap_or_default()
+    );
+
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(700));
+        if let Err(err) = platform::set_clipboard_text(&marker) {
+            eprintln!("probe write failed: {err}");
+        }
+    });
+
+    let main_loop = gtk::glib::MainLoop::new(None, false);
+    let loop_for_timeout = main_loop.clone();
+    let observed = Arc::new(AtomicBool::new(false));
+    let observed_for_poll = Arc::clone(&observed);
+    let deadline = Instant::now() + Duration::from_secs(6);
+
+    gtk::glib::timeout_add_local(Duration::from_millis(50), move || {
+        match notify_rx.try_recv() {
+            Ok(()) => {
+                observed_for_poll.store(true, Ordering::SeqCst);
+                println!("owner-change: observed");
+                loop_for_timeout.quit();
+                gtk::glib::ControlFlow::Break
+            }
+            Err(TryRecvError::Empty) if Instant::now() < deadline => {
+                gtk::glib::ControlFlow::Continue
+            }
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => {
+                eprintln!("owner-change: not observed within 6s");
+                loop_for_timeout.quit();
+                gtk::glib::ControlFlow::Break
+            }
+        }
+    });
+
+    main_loop.run();
+    let _ = writer.join();
+
+    if observed.load(Ordering::SeqCst) {
+        println!("watch-round-trip: ok");
+    } else {
+        eprintln!("watch-round-trip: failed");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn watch_for_change() {
+    eprintln!("--watch is only implemented for the Linux GTK backend");
+    std::process::exit(1);
 }
 
 fn describe(snapshot: &Option<platform::ClipboardSnapshot>) -> &'static str {
