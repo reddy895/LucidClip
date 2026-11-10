@@ -20,7 +20,7 @@ use crate::clipboard::events::{
 use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
 use crate::database::{DbClipboardEntry, DbPool, SettingsRepo};
-use crate::errors::{AppError, Result};
+use crate::errors::Result;
 use crate::platform::{self, ClipboardSnapshot};
 use crate::storage::AppPaths;
 
@@ -54,6 +54,10 @@ pub struct MonitorStatus {
     pub last_capture_at: Option<i64>,
     pub last_error: Option<String>,
     pub started_at: Option<i64>,
+    /// Last persisted fingerprint, shared with manual captures so the safety
+    /// poll does not immediately re-capture the same clipboard value.
+    #[serde(skip)]
+    last_hash: Option<String>,
 }
 
 pub fn initial_status() -> MonitorStatus {
@@ -68,6 +72,7 @@ pub fn initial_status() -> MonitorStatus {
         last_capture_at: None,
         last_error: None,
         started_at: None,
+        last_hash: None,
     }
 }
 
@@ -176,16 +181,12 @@ fn is_excluded_process(policy: &MonitorPolicy, process: Option<&str>) -> bool {
         .any(|excluded| excluded.eq_ignore_ascii_case(process))
 }
 
-/// Tracks the last successfully persisted fingerprint so repeated safety polls
-/// do not re-emit the same clipboard value.
-struct CaptureState {
-    last_hash: Option<String>,
+fn last_hash(status: &Arc<Mutex<MonitorStatus>>) -> Option<String> {
+    status.lock().ok().and_then(|guard| guard.last_hash.clone())
 }
 
-impl CaptureState {
-    fn new() -> Self {
-        Self { last_hash: None }
-    }
+fn set_last_hash(status: &Arc<Mutex<MonitorStatus>>, hash: Option<String>) {
+    update_status(status, |state| state.last_hash = hash);
 }
 
 fn fail(status: &Arc<Mutex<MonitorStatus>>, message: String) {
@@ -202,8 +203,8 @@ fn capture_clipboard_once(
     pool: &DbPool,
     paths: &AppPaths,
     policy: &MonitorPolicy,
-    state: &mut CaptureState,
     status: &Arc<Mutex<MonitorStatus>>,
+    force: bool,
 ) -> Option<DbClipboardEntry> {
     let foreground = match platform::foreground_process_name() {
         Ok(name) => name,
@@ -241,14 +242,14 @@ fn capture_clipboard_once(
             }
 
             let hash = hash_content(&text);
-            if state.last_hash.as_deref() == Some(hash.as_str()) {
+            if !force && last_hash(status).as_deref() == Some(hash.as_str()) {
                 return None;
             }
 
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_text(&text, foreground) {
                 Ok(entry) => {
-                    record_capture(app, state, status, &entry);
+                    record_capture(app, status, &entry);
                     return Some(entry);
                 }
                 Err(err) => fail(status, format!("Failed to persist clipboard text: {err}")),
@@ -258,7 +259,7 @@ fn capture_clipboard_once(
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_image(image, foreground) {
                 Ok(entry) => {
-                    record_capture(app, state, status, &entry);
+                    record_capture(app, status, &entry);
                     return Some(entry);
                 }
                 Err(err) => fail(status, format!("Failed to persist clipboard image: {err}")),
@@ -275,7 +276,7 @@ fn capture_clipboard_once(
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_files(files, foreground) {
                 Ok(entry) => {
-                    record_capture(app, state, status, &entry);
+                    record_capture(app, status, &entry);
                     return Some(entry);
                 }
                 Err(err) => fail(status, format!("Failed to persist clipboard files: {err}")),
@@ -284,7 +285,7 @@ fn capture_clipboard_once(
         Ok(_) => {
             // The clipboard no longer holds a supported value. Clear the
             // fingerprint so the same content is captured again later.
-            state.last_hash = None;
+            set_last_hash(status, None);
         }
         Err(err) => {
             // Clipboard contention is expected; retry on the next tick.
@@ -295,13 +296,8 @@ fn capture_clipboard_once(
     None
 }
 
-fn record_capture(
-    app: &AppHandle,
-    state: &mut CaptureState,
-    status: &Arc<Mutex<MonitorStatus>>,
-    entry: &DbClipboardEntry,
-) {
-    state.last_hash = Some(entry.content_hash.clone());
+fn record_capture(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>, entry: &DbClipboardEntry) {
+    set_last_hash(status, Some(entry.content_hash.clone()));
 
     let now = Utc::now().timestamp_millis();
     update_status(status, |state| {
@@ -328,7 +324,6 @@ fn run_monitor(
     status: Arc<Mutex<MonitorStatus>>,
 ) {
     println!("[LucidClip Monitor] Clipboard monitor started.");
-    let mut state = CaptureState::new();
 
     update_status(&status, |state| {
         state.running = true;
@@ -367,7 +362,7 @@ fn run_monitor(
     let policy = monitor_policy(&pool);
     update_status(&status, |state| state.paused = !policy.enabled);
     if policy.enabled {
-        capture_clipboard_once(&app, &pool, &paths, &policy, &mut state, &status);
+        capture_clipboard_once(&app, &pool, &paths, &policy, &status, false);
     }
     emit_status(&app, &status);
 
@@ -398,11 +393,11 @@ fn run_monitor(
         let was_paused = !policy.enabled;
         update_status(&status, |state| state.paused = was_paused);
         if policy.enabled {
-            capture_clipboard_once(&app, &pool, &paths, &policy, &mut state, &status);
+            capture_clipboard_once(&app, &pool, &paths, &policy, &status, false);
         } else {
             // Forget the last fingerprint so resuming captures the current
             // clipboard again instead of silently treating it as a duplicate.
-            state.last_hash = None;
+            set_last_hash(&status, None);
         }
     }
 
@@ -413,7 +408,9 @@ fn run_monitor(
 
 /// Capture the clipboard immediately on explicit user request.
 ///
-/// This respects the pause setting and never bypasses exclusions.
+/// The explicit request is treated as consent, so it still works while the
+/// background monitor is paused. It never bypasses app exclusions or the
+/// sensitive-content check, and it does not resume the monitor.
 pub fn capture_now(
     app: &AppHandle,
     pool: &DbPool,
@@ -421,16 +418,8 @@ pub fn capture_now(
     status: &Arc<Mutex<MonitorStatus>>,
 ) -> Result<Option<DbClipboardEntry>> {
     let policy = monitor_policy(pool);
-    if !policy.enabled {
-        return Err(AppError::Clipboard(
-            "Clipboard monitoring is paused; resume it before capturing".into(),
-        ));
-    }
-
-    update_status(status, |state| state.paused = false);
-    let mut state = CaptureState::new();
     Ok(capture_clipboard_once(
-        app, pool, paths, &policy, &mut state, status,
+        app, pool, paths, &policy, status, true,
     ))
 }
 
@@ -517,6 +506,16 @@ mod tests {
         )
         .unwrap();
         assert!(monitoring_enabled(&pool));
+    }
+
+    #[test]
+    fn status_serialization_omits_the_internal_fingerprint() {
+        let status = Arc::new(Mutex::new(initial_status()));
+        set_last_hash(&status, Some("fingerprint-that-must-not-ship".into()));
+
+        let value = serde_json::to_value(status_snapshot(&status)).unwrap();
+        assert!(value.get("last_hash").is_none());
+        assert!(!value.to_string().contains("fingerprint-that-must-not-ship"));
     }
 
     #[test]

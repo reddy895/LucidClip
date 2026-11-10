@@ -166,57 +166,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isLoading, settings.general.defaultView]);
 
   useEffect(() => {
-    if (!isTauri()) {
-      void refreshData();
-      void refreshClipboardStatus();
-      return;
-    }
-
     let cancelled = false;
     const disposers: Array<() => void> = [];
 
     const setup = async () => {
-      const disposeCapture = await listen<unknown>(CLIPBOARD_EVENT_NAME, (event) => {
-        const dto: DbClipboardDto | null = validateClipboardEventPayload(event.payload);
-        if (!dto) {
-          console.warn('[LucidClip] Ignored malformed clipboard event payload');
-          return;
-        }
+      if (isTauri()) {
+        try {
+          const disposeCapture = await listen<unknown>(CLIPBOARD_EVENT_NAME, (event) => {
+            const dto: DbClipboardDto | null = validateClipboardEventPayload(event.payload);
+            if (!dto) {
+              console.warn('[LucidClip] Ignored malformed clipboard event payload');
+              return;
+            }
 
-        const entry = mapClipboardDtoToEntry(dto);
-        setClipboardItems((previous) => mergeClipboardEntry(previous, entry));
-        setSelectedItem((previous) =>
-          previous?.kind === 'clipboard' && previous.id === entry.id
-            ? { kind: 'clipboard', ...entry }
-            : previous
-        );
-        void storageService
-          .getStorageUsage()
-          .then(setStorageStats)
-          .catch((err) =>
-            console.error('[LucidClip] Failed to refresh storage after capture', err)
+            const entry = mapClipboardDtoToEntry(dto);
+            setClipboardItems((previous) => mergeClipboardEntry(previous, entry));
+            setSelectedItem((previous) =>
+              previous?.kind === 'clipboard' && previous.id === entry.id
+                ? { kind: 'clipboard', ...entry }
+                : previous
+            );
+            void storageService
+              .getStorageUsage()
+              .then(setStorageStats)
+              .catch((err) =>
+                console.error('[LucidClip] Failed to refresh storage after capture', err)
+              );
+            void refreshClipboardStatus();
+          });
+
+          if (cancelled) {
+            disposeCapture();
+            return;
+          }
+          disposers.push(disposeCapture);
+
+          const disposeStatus = await listen<ClipboardMonitorStatus>(
+            CLIPBOARD_STATUS_EVENT_NAME,
+            (event) => setMonitorStatus(event.payload)
           );
-        void refreshClipboardStatus();
-      });
 
-      const disposeStatus = await listen<ClipboardMonitorStatus>(
-        CLIPBOARD_STATUS_EVENT_NAME,
-        (event) => setMonitorStatus(event.payload)
-      );
-
-      if (cancelled) {
-        disposeCapture();
-        disposeStatus();
-        return;
+          if (cancelled) {
+            disposeStatus();
+            return;
+          }
+          disposers.push(disposeStatus);
+        } catch (err) {
+          console.error('[LucidClip] Failed to subscribe to clipboard events', err);
+        }
       }
 
-      disposers.push(disposeCapture, disposeStatus);
+      if (cancelled) return;
       await refreshData();
       await refreshClipboardStatus();
     };
 
     void setup().catch((err) => {
-      console.error('[LucidClip] Failed to subscribe to clipboard events', err);
+      console.error('[LucidClip] Failed to load application data', err);
     });
 
     return () => {
@@ -425,6 +431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const reset = await settingsService.resetToDefaults();
       setSettings(reset);
+      await refreshClipboardStatus();
       toast.info('Settings reset to defaults.');
     } catch (err) {
       reportActionError('Reset settings', err);
@@ -433,22 +440,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setMonitoringEnabled = async (enabled: boolean) => {
     try {
+      // Keep the persisted settings cache in sync before asking the backend to
+      // report status, otherwise a later full settings write could restore the
+      // previous monitoring flag from a stale cache.
+      const updated = await settingsService.updateSettings({
+        clipboard: { ...settings.clipboard, monitoringEnabled: enabled },
+        privacy: { ...settings.privacy, pauseMonitoring: !enabled },
+      });
+      setSettings(updated);
+
       const status = await clipboardService.setMonitoringEnabled(enabled);
       setMonitorStatus(status);
-
-      if (isTauri()) {
-        setSettings((previous) => ({
-          ...previous,
-          clipboard: { ...previous.clipboard, monitoringEnabled: enabled },
-          privacy: { ...previous.privacy, pauseMonitoring: !enabled },
-        }));
-      } else {
-        const updated = await settingsService.updateSettings({
-          clipboard: { ...settings.clipboard, monitoringEnabled: enabled },
-          privacy: { ...settings.privacy, pauseMonitoring: !enabled },
-        });
-        setSettings(updated);
-      }
 
       toast.info(enabled ? 'Monitoring active.' : 'Monitoring paused.');
     } catch (err) {

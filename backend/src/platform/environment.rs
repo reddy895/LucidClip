@@ -127,8 +127,7 @@ fn linux_backend_ready() -> bool {
 fn gtk_runtime_diagnostic() -> Option<String> {
     if linux_backend_ready() {
         None
-    } else if std::env::var_os("DISPLAY").is_none()
-        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    } else if std::env::var_os("DISPLAY").is_none() && std::env::var_os("WAYLAND_DISPLAY").is_none()
     {
         Some(
             "No graphical clipboard session was detected. Set DISPLAY or WAYLAND_DISPLAY before launching LucidClip."
@@ -163,21 +162,20 @@ pub fn describe(
     let session = ClipboardSession::detect(session_type, wayland_display, display);
     let mut diagnostics = Vec::new();
 
-    let (backend, monitoring_supported, supports_text, supports_images, supports_files) = if os
-        == "windows"
-    {
-        ("windows-native", true, true, true, true)
-    } else if os == "linux" {
-        (
-            "linux-gtk",
-            backend_ready,
-            backend_ready,
-            backend_ready,
-            backend_ready,
-        )
-    } else {
-        ("unsupported", false, false, false, false)
-    };
+    let (backend, monitoring_supported, supports_text, supports_images, supports_files) =
+        if os == "windows" {
+            ("windows-native", true, true, true, true)
+        } else if os == "linux" {
+            (
+                "linux-gtk",
+                backend_ready,
+                backend_ready,
+                backend_ready,
+                backend_ready,
+            )
+        } else {
+            ("unsupported", false, false, false, false)
+        };
 
     if os == "linux" {
         if let Some(diagnostic) = gtk_runtime_diagnostic() {
@@ -205,14 +203,17 @@ pub fn describe(
         }
 
         if session == ClipboardSession::Unsupported {
-            diagnostics.push(
-                "Neither a Wayland nor an X11 clipboard session is active.".to_string(),
-            );
+            diagnostics
+                .push("Neither a Wayland nor an X11 clipboard session is active.".to_string());
         }
-    } else if os != "windows" {
+
         diagnostics.push(
-            "Clipboard monitoring is not implemented for this operating system.".to_string(),
+            "Foreground application detection is unavailable on Linux, so per-app exclusions are stored but cannot be enforced."
+                .to_string(),
         );
+    } else if os != "windows" {
+        diagnostics
+            .push("Clipboard monitoring is not implemented for this operating system.".to_string());
     }
 
     ClipboardEnvironment {
@@ -333,6 +334,24 @@ mod tests {
             .diagnostics
             .iter()
             .any(|item| item.contains("GTK clipboard backend")));
+    }
+
+    #[test]
+    fn documents_linux_per_app_exclusion_limitation() {
+        let environment = describe(
+            "linux",
+            Some("wayland"),
+            Some("wayland-0"),
+            None,
+            None,
+            no_utilities(),
+            true,
+        );
+
+        assert!(environment
+            .diagnostics
+            .iter()
+            .any(|item| item.contains("per-app exclusions")));
     }
 
     #[test]

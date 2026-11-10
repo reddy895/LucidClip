@@ -244,6 +244,7 @@ pub fn run() {
                     .monitor_stop
                     .store(true, std::sync::atomic::Ordering::Relaxed);
             }
+            platform::shutdown_clipboard_backend();
         }
     });
 }

@@ -32,7 +32,10 @@ fn main() {
     if std::env::args().any(|arg| arg == "--read") {
         match platform::read_clipboard_snapshot() {
             Ok(Some(platform::ClipboardSnapshot::Text(text))) => {
-                println!("clipboard contains text ({} characters)", text.chars().count());
+                println!(
+                    "clipboard contains text ({} characters)",
+                    text.chars().count()
+                );
             }
             Ok(Some(platform::ClipboardSnapshot::Image(image))) => {
                 println!(

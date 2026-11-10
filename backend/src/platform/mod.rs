@@ -50,6 +50,14 @@ pub fn initialize_clipboard_backend() -> std::result::Result<(), String> {
     }
 }
 
+/// Release clipboard resources during application shutdown.
+pub fn shutdown_clipboard_backend() {
+    #[cfg(target_os = "linux")]
+    {
+        clipboard_linux::shutdown();
+    }
+}
+
 /// Whether this build can read the operating-system clipboard on this host.
 pub fn clipboard_backend_ready() -> bool {
     #[cfg(target_os = "windows")]
