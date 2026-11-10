@@ -441,7 +441,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const reset = await settingsService.resetToDefaults();
       setSettings(reset);
-      await refreshClipboardStatus();
+      const enabled = reset.clipboard.monitoringEnabled && !reset.privacy.pauseMonitoring;
+      setMonitorStatus(await clipboardService.setMonitoringEnabled(enabled));
       toast.info('Settings reset to defaults.');
     } catch (err) {
       reportActionError('Reset settings', err);
