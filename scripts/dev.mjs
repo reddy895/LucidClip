@@ -20,7 +20,7 @@ import {
 import { isPortAvailable } from './lib/port-detector.mjs';
 import { getProcessOnPort } from './lib/process-info.mjs';
 import { formatPortConflictError } from './lib/error-reporter.mjs';
-import { safeCleanupOccupiedPort } from './lib/process-cleanup.mjs';
+import { safeCleanupOccupiedPort, killProcessTree } from './lib/process-cleanup.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const rootDir = path.resolve(path.dirname(__filename), '..');
@@ -138,40 +138,68 @@ async function main() {
 
   let shuttingDown = false;
 
+  function cleanupLeftoverDevServer() {
+    const info = getProcessOnPort(DEV_SERVER_PORT);
+    if (info.occupied && info.process?.isLucidClip && info.process?.pid) {
+      try {
+        killProcessTree(info.process.pid);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   function terminate(signal = 'SIGINT') {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    if (!child.pid) {
-      process.exit(0);
-    }
-
-    if (isWindows) {
-      spawnSync('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' });
-    } else {
-      try {
-        process.kill(-child.pid, signal);
-      } catch {
+    if (child && child.pid) {
+      if (isWindows) {
+        spawnSync('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' });
+      } else {
         try {
-          child.kill(signal);
+          process.kill(-child.pid, signal);
         } catch {
-          // Process already exited
+          try {
+            child.kill(signal);
+          } catch {
+            // Process already exited
+          }
         }
       }
     }
 
-    setTimeout(() => process.exit(0), 1500).unref();
+    // Clean up any detached or orphaned Vite server that Tauri might have spawned
+    cleanupLeftoverDevServer();
+
+    setTimeout(() => {
+      cleanupLeftoverDevServer();
+      process.exit(0);
+    }, 500).unref();
   }
 
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     process.on(signal, () => terminate(signal));
   }
 
+  process.on('exit', () => {
+    cleanupLeftoverDevServer();
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('[LucidClip] Uncaught exception in launcher:', err);
+    terminate('SIGTERM');
+  });
+
   child.on('error', (err) => {
+    cleanupLeftoverDevServer();
     fail(`Failed to start the Tauri process: ${err.message}`);
   });
 
   child.on('close', (code, signal) => {
+    // When Tauri process terminates, guarantee no orphaned Vite server remains
+    cleanupLeftoverDevServer();
+
     if (shuttingDown) {
       return;
     }
