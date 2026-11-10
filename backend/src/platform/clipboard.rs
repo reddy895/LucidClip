@@ -868,11 +868,16 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
         windows_clipboard::write_text(text)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::write_text(text)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         let _ = text;
         Err(AppError::Clipboard(
-            "Clipboard writing is only available on Windows".into(),
+            "Clipboard writing is not implemented for this operating system".into(),
         ))
     }
 }
@@ -884,11 +889,16 @@ pub fn set_clipboard_image(rgba: &[u8], width: u32, height: u32) -> Result<()> {
         windows_clipboard::write_image(rgba, width, height)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::write_image(rgba, width, height)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         let _ = (rgba, width, height);
         Err(AppError::Clipboard(
-            "Copying images is only available on Windows".into(),
+            "Copying images is not implemented for this operating system".into(),
         ))
     }
 }
@@ -900,11 +910,16 @@ pub fn set_clipboard_files(files: &[String]) -> Result<()> {
         windows_clipboard::write_files(files)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::write_files(files)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         let _ = files;
         Err(AppError::Clipboard(
-            "Copying files is only available on Windows".into(),
+            "Copying files is not implemented for this operating system".into(),
         ))
     }
 }
@@ -916,7 +931,12 @@ pub fn read_clipboard_snapshot() -> Result<Option<ClipboardSnapshot>> {
         windows_clipboard::read_snapshot()
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::read_snapshot()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         Ok(None)
     }
@@ -925,15 +945,20 @@ pub fn read_clipboard_snapshot() -> Result<Option<ClipboardSnapshot>> {
 /// Read text from the operating system clipboard when the platform supports it.
 ///
 /// `Ok(None)` means the clipboard contains no supported text format. On hosts
-/// without native clipboard integration this always returns `Ok(None)` so
-/// development builds never fabricate clipboard content.
+/// without a clipboard backend this returns `Ok(None)` so development builds
+/// never fabricate clipboard content.
 pub fn read_clipboard_text() -> Result<Option<String>> {
     #[cfg(target_os = "windows")]
     {
         windows_clipboard::read_text()
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::read_text()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         Ok(None)
     }
@@ -947,15 +972,20 @@ pub fn clipboard_content_is_sensitive() -> Result<bool> {
         windows_clipboard::content_is_sensitive()
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform::clipboard_linux::content_is_sensitive()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         Ok(false)
     }
 }
 
 /// Whether background clipboard monitoring is available on this host.
-pub const fn clipboard_monitoring_supported() -> bool {
-    cfg!(target_os = "windows")
+pub fn clipboard_monitoring_supported() -> bool {
+    crate::platform::clipboard_backend_ready()
 }
 
 #[cfg(test)]
