@@ -97,6 +97,15 @@ export async function safeCleanupOccupiedPort(port, { force = false } = {}) {
 
   const proc = info.process;
 
+  // STRICT SAFETY GUARD: Never kill self or parent process!
+  if (proc.pid === process.pid || proc.pid === process.ppid) {
+    return {
+      cleaned: false,
+      reason: 'protected_self_process',
+      process: proc,
+    };
+  }
+
   // STRICT SAFETY GUARD: Never kill unrelated processes!
   if (!proc.isLucidClip) {
     return {

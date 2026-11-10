@@ -211,14 +211,25 @@ export function getProcessDetails(pid) {
     }
   }
 
-  // Determine if this process belongs to LucidClip
+  // Determine if this process belongs to a LucidClip development server.
+  // Must be an active Vite or Tauri development server process, and must never be self.
+  const isSelf = pid === process.pid || pid === process.ppid;
   const normalizedCommand = command.toLowerCase();
   const normalizedCwd = cwd.toLowerCase();
-  const isLucidClip =
-    normalizedCommand.includes('lucidclip') ||
+
+  const isDevServerCommand =
     normalizedCommand.includes('vite') ||
     normalizedCommand.includes('tauri') ||
-    normalizedCwd.includes('lucidclip');
+    (normalizedCommand.includes('lucidclip') &&
+      !normalizedCommand.includes('test') &&
+      !normalizedCommand.includes('git'));
+
+  const isDevServerCwd =
+    normalizedCwd.endsWith('frontend') ||
+    normalizedCwd.endsWith('backend') ||
+    normalizedCwd.endsWith('lucidclip');
+
+  const isLucidClip = !isSelf && isDevServerCommand && isDevServerCwd;
 
   return {
     pid,
