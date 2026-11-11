@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScreenshotEntry, HistoryItem } from '@/types';
 import { cn, formatRelativeTime, formatBytes } from '@/utils';
 import { Badge, Tooltip } from '@/components/ui';
-import { Copy, Pin, Star, Trash2, Eye } from 'lucide-react';
+import { Copy, Pin, Star, Trash2, Eye, ImageOff, Loader2 } from 'lucide-react';
 import { useApp } from '@/context';
+import { screenshotService } from '@/services';
 
 export interface ScreenshotThumbnailProps {
   screenshot: ScreenshotEntry;
@@ -20,6 +21,40 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
 }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
   const asHistoryItem: HistoryItem = { kind: 'screenshot', ...screenshot };
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | undefined>(screenshot.thumbnailUrl);
+  const [thumbnailState, setThumbnailState] = useState<'loading' | 'ready' | 'error'>(
+    screenshot.thumbnailUrl ? 'ready' : 'loading'
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    if (screenshot.thumbnailAvailable === false) {
+      setThumbnailUrl(undefined);
+      setThumbnailState('error');
+      return () => {
+        active = false;
+      };
+    }
+
+    setThumbnailState('loading');
+    screenshotService
+      .getScreenshotImageUrl(screenshot.id, 'thumbnail')
+      .then((url) => {
+        if (!active) return;
+        setThumbnailUrl(url);
+        setThumbnailState('ready');
+      })
+      .catch(() => {
+        if (!active) return;
+        setThumbnailUrl(undefined);
+        setThumbnailState('error');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [screenshot.id, screenshot.thumbnailAvailable]);
 
   return (
     <div
@@ -35,12 +70,31 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
     >
       {/* Thumbnail Aspect Box */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#151719]">
-        <img
-          src={screenshot.thumbnailUrl}
-          alt={`Screenshot from ${screenshot.createdAt}`}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
+        {thumbnailState === 'ready' && thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={`Screenshot from ${screenshot.createdAt}`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={() => {
+              setThumbnailUrl(undefined);
+              setThumbnailState('error');
+            }}
+          />
+        ) : thumbnailState === 'loading' ? (
+          <div className="flex h-full w-full items-center justify-center text-graphite-text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-3 text-center text-graphite-text-muted">
+            <ImageOff className="h-5 w-5" />
+            <span className="text-[10px] leading-tight">
+              {screenshot.originalAvailable === false
+                ? 'Screenshot file is missing'
+                : 'Thumbnail unavailable'}
+            </span>
+          </div>
+        )}
 
         {/* Capture type top left */}
         <div className="absolute top-2 left-2">
