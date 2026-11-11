@@ -20,6 +20,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 regex = "1.10"
 directories = "5.0"
+base64 = "0.22"
 
 [build-dependencies]
 tauri-build = { version = "2.2", features = [] }

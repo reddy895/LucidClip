@@ -3,8 +3,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::Utc;
 use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
+use serde::Serialize;
 
 use crate::database::{DbPool, DbScreenshotEntry, ScreenshotRepo};
 use crate::errors::{AppError, Result};
@@ -30,6 +32,41 @@ pub struct CaptureRegion {
 pub enum CaptureMode {
     Fullscreen,
     Region(CaptureRegion),
+}
+
+/// Which stored file the frontend is asking for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScreenshotVariant {
+    Thumbnail,
+    Original,
+}
+
+impl ScreenshotVariant {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "thumbnail" => Ok(Self::Thumbnail),
+            "original" => Ok(Self::Original),
+            other => Err(AppError::InvalidInput(format!(
+                "Unsupported screenshot image variant: {other}"
+            ))),
+        }
+    }
+}
+
+/// Screenshot metadata enriched with current file availability.
+#[derive(Debug, Clone, Serialize)]
+pub struct ScreenshotGalleryEntry {
+    #[serde(flatten)]
+    pub entry: DbScreenshotEntry,
+    pub thumbnail_available: bool,
+    pub original_available: bool,
+}
+
+/// A validated image payload safe to hand to the webview.
+#[derive(Debug, Clone, Serialize)]
+pub struct ScreenshotImageData {
+    pub mime_type: String,
+    pub data_url: String,
 }
 
 impl CaptureMode {
@@ -197,6 +234,72 @@ impl<'a> ScreenshotService<'a> {
         self.repo.list_all()
     }
 
+    /// List screenshots with file health, regenerating missing thumbnails
+    /// whenever the original image is still present.
+    pub fn list_gallery(&self) -> Result<Vec<ScreenshotGalleryEntry>> {
+        self.repo
+            .list_all()?
+            .into_iter()
+            .map(|entry| {
+                let original_available = self
+                    .paths
+                    .resolve_media_file(Path::new(&entry.original_path))
+                    .is_ok();
+                let thumbnail_available = self.ensure_thumbnail(&entry).is_ok();
+
+                Ok(ScreenshotGalleryEntry {
+                    entry,
+                    thumbnail_available,
+                    original_available,
+                })
+            })
+            .collect()
+    }
+
+    /// Load a validated thumbnail or original image as a data URL.
+    pub fn load_image(&self, id: &str, variant: ScreenshotVariant) -> Result<ScreenshotImageData> {
+        let entry = self
+            .repo
+            .find_by_id(id)?
+            .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+
+        let path = match variant {
+            ScreenshotVariant::Thumbnail => self.ensure_thumbnail(&entry)?,
+            ScreenshotVariant::Original => self
+                .paths
+                .resolve_media_file(Path::new(&entry.original_path))?,
+        };
+
+        image_data_url(&path)
+    }
+
+    fn ensure_thumbnail(&self, entry: &DbScreenshotEntry) -> Result<PathBuf> {
+        let candidate = Path::new(&entry.thumbnail_path);
+        self.paths.validate_media_path(candidate)?;
+
+        if let Ok(existing) = self.paths.resolve_media_file(candidate) {
+            return Ok(existing);
+        }
+
+        let original = self
+            .paths
+            .resolve_media_file(Path::new(&entry.original_path))?;
+        let source = image::open(&original)?;
+        let thumbnail = source.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+
+        if let Some(parent) = candidate.parent() {
+            fs::create_dir_all(parent).map_err(|err| {
+                AppError::Storage(format!(
+                    "Failed to create thumbnail directory {}: {err}",
+                    parent.display()
+                ))
+            })?;
+        }
+
+        thumbnail.save_with_format(candidate, ImageFormat::Png)?;
+        self.paths.resolve_media_file(candidate)
+    }
+
     pub fn get(&self, id: &str) -> Result<Option<DbScreenshotEntry>> {
         self.repo.find_by_id(id)
     }
@@ -248,6 +351,30 @@ impl<'a> ScreenshotService<'a> {
 
         Ok(deleted)
     }
+}
+
+fn image_data_url(path: &Path) -> Result<ScreenshotImageData> {
+    let bytes = fs::read(path).map_err(|err| {
+        AppError::Storage(format!(
+            "Failed to read screenshot image {}: {err}",
+            path.display()
+        ))
+    })?;
+    let mime_type = match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        _ => "image/png",
+    };
+
+    Ok(ScreenshotImageData {
+        mime_type: mime_type.to_string(),
+        data_url: format!("data:{mime_type};base64,{}", STANDARD.encode(bytes)),
+    })
 }
 
 fn remove_file_if_exists(path: &Path) {
@@ -418,6 +545,145 @@ mod tests {
         assert!(!Path::new(&entry.thumbnail_path).exists());
         assert!(service.list().unwrap().is_empty());
 
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn gallery_regenerates_a_missing_thumbnail_and_loads_it() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-gallery-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ScreenshotService::new(&pool, &paths);
+
+        let entry = service
+            .store(test_image(64, 48), "fullscreen", None)
+            .unwrap();
+        fs::remove_file(&entry.thumbnail_path).unwrap();
+
+        let gallery = service.list_gallery().unwrap();
+        assert_eq!(gallery.len(), 1);
+        assert!(gallery[0].thumbnail_available);
+        assert!(gallery[0].original_available);
+        assert!(Path::new(&entry.thumbnail_path).is_file());
+
+        let image = service
+            .load_image(&entry.id, ScreenshotVariant::Thumbnail)
+            .unwrap();
+        assert_eq!(image.mime_type, "image/png");
+        assert!(image.data_url.starts_with("data:image/png;base64,"));
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn gallery_reports_missing_files_without_crashing() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-missing-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ScreenshotService::new(&pool, &paths);
+
+        let entry = DbScreenshotEntry {
+            id: "shot_missing".into(),
+            original_path: paths
+                .originals_dir
+                .join("shot_missing.png")
+                .to_string_lossy()
+                .into_owned(),
+            thumbnail_path: paths
+                .thumbnails_dir
+                .join("shot_missing.png")
+                .to_string_lossy()
+                .into_owned(),
+            width: 10,
+            height: 10,
+            file_size: 0,
+            ocr_text: None,
+            created_at: Utc::now().timestamp_millis(),
+            pinned: false,
+            favorite: false,
+            capture_type: "fullscreen".into(),
+            region_x: None,
+            region_y: None,
+            region_width: None,
+            region_height: None,
+        };
+        service.repo.insert(&entry).unwrap();
+
+        let gallery = service.list_gallery().unwrap();
+        assert_eq!(gallery.len(), 1);
+        assert!(!gallery[0].thumbnail_available);
+        assert!(!gallery[0].original_available);
+        assert!(matches!(
+            service.load_image("shot_missing", ScreenshotVariant::Original),
+            Err(AppError::NotFound(_))
+        ));
+        assert!(service.delete("shot_missing").unwrap());
+        assert!(service.list().unwrap().is_empty());
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn rows_outside_the_screenshot_root_are_not_read_or_deleted() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-outside-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let outside = root
+            .parent()
+            .unwrap()
+            .join(format!("lucidclip-outside-shot-{}.png", std::process::id()));
+        fs::write(&outside, b"keep").unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ScreenshotService::new(&pool, &paths);
+
+        let entry = DbScreenshotEntry {
+            id: "shot_outside".into(),
+            original_path: outside.to_string_lossy().into_owned(),
+            thumbnail_path: outside.to_string_lossy().into_owned(),
+            width: 10,
+            height: 10,
+            file_size: 4,
+            ocr_text: None,
+            created_at: Utc::now().timestamp_millis(),
+            pinned: false,
+            favorite: false,
+            capture_type: "fullscreen".into(),
+            region_x: None,
+            region_y: None,
+            region_width: None,
+            region_height: None,
+        };
+        service.repo.insert(&entry).unwrap();
+
+        let gallery = service.list_gallery().unwrap();
+        assert!(!gallery[0].original_available);
+        assert!(!gallery[0].thumbnail_available);
+        assert!(matches!(
+            service.load_image("shot_outside", ScreenshotVariant::Original),
+            Err(AppError::InvalidInput(_))
+        ));
+        assert!(service.delete("shot_outside").unwrap());
+        assert!(outside.is_file());
+
+        fs::remove_file(outside).ok();
         fs::remove_dir_all(&root).ok();
     }
 
