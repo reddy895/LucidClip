@@ -44,7 +44,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'clipboard',
-      label: 'Clipboard',
+      label: 'Text',
       icon: <ClipboardList className="h-4 w-4" />,
       count: clipboardItems.length,
       shortcut: 'Ctrl+2',

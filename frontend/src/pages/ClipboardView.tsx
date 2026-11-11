@@ -5,6 +5,7 @@ import { SearchEmptyState, SortDropdown } from '@/components/search';
 import { ClipboardRow, ClipboardToolbar } from '@/components/clipboard';
 import { useListKeyboardNavigation } from '@/hooks';
 import { ClipboardList, Trash2 } from 'lucide-react';
+import { selectTextEntries } from '@/utils';
 import { ClipboardContentType } from '@/types';
 import { ConfirmationModal } from '@/components/ui';
 
@@ -21,10 +22,12 @@ export const ClipboardView: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'char_count' | 'source_app'>('newest');
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
+  const textItems = useMemo(() => selectTextEntries(clipboardItems), [clipboardItems]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    return clipboardItems
+    return textItems
       .filter((item) => {
         if (selectedType !== 'all' && item.contentType !== selectedType) {
           return false;
@@ -51,7 +54,7 @@ export const ClipboardView: React.FC = () => {
         if (sortOrder === 'source_app') return (a.sourceApp || '').localeCompare(b.sourceApp || '');
         return 0;
       });
-  }, [clipboardItems, query, selectedType, sortOrder]);
+  }, [textItems, query, selectedType, sortOrder]);
 
   const historyItems = useMemo(
     () => filtered.map((c) => ({ kind: 'clipboard' as const, ...c })),
@@ -69,7 +72,6 @@ export const ClipboardView: React.FC = () => {
     { id: 'json', label: 'JSON' },
     { id: 'color_code', label: 'Colors' },
     { id: 'path', label: 'Paths' },
-    { id: 'image', label: 'Images' },
     { id: 'files', label: 'Files' },
   ];
 
@@ -77,8 +79,8 @@ export const ClipboardView: React.FC = () => {
     <div className="flex flex-col h-full w-full">
       {/* Page Header */}
       <SectionHeader
-        title="Clipboard History"
-        description="Search, preview, and restore your copied snippets and URLs."
+        title="Text History"
+        description="Search, preview, and restore copied text, links, code, and file paths."
         badge={
           <Badge variant="default" size="sm" className="font-mono">
             {filtered.length}
@@ -113,7 +115,7 @@ export const ClipboardView: React.FC = () => {
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Search clipboard text, code, paths, files..."
+            placeholder="Search text, code, paths, files..."
             shortcutBadge="/"
           />
         </div>
@@ -143,8 +145,8 @@ export const ClipboardView: React.FC = () => {
           ) : (
             <EmptyState
               icon={<ClipboardList className="h-5 w-5" />}
-              title="No clipboard entries yet."
-              description="Copy text, links, images, or files in any application and they will appear here automatically."
+              title="No text entries yet."
+              description="Copy text, links, code, or file paths in any application and they will appear here automatically."
             />
           )
         ) : (
@@ -171,7 +173,7 @@ export const ClipboardView: React.FC = () => {
           setIsClearModalOpen(false);
         }}
         title="Clear Clipboard History"
-        description="Are you sure you want to clear your clipboard history? Pinned items will be preserved safely."
+        description="Are you sure you want to clear your text history? Pinned and favorite items will be preserved safely."
         confirmText="Clear History"
         isDestructive={true}
       />
