@@ -3,7 +3,10 @@
 use crate::clipboard::ClipboardService;
 use crate::database::{DbClipboardEntry, DbScreenshotEntry, SettingsRepo};
 use crate::errors::{AppError, Result};
-use crate::screenshots::{CaptureMode, CaptureRegion, ScreenshotService};
+use crate::screenshots::{
+    CaptureMode, CaptureRegion, ScreenshotGalleryEntry, ScreenshotImageData, ScreenshotService,
+    ScreenshotVariant,
+};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -210,9 +213,26 @@ pub struct CaptureRegionDto {
 }
 
 #[tauri::command]
-pub fn get_screenshots(state: tauri::State<'_, AppState>) -> Result<Vec<DbScreenshotEntry>> {
+pub fn get_screenshots(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<ScreenshotGalleryEntry>> {
     let service = ScreenshotService::new(&state.pool, &state.paths);
-    service.list()
+    service.list_gallery()
+}
+
+/// Return a validated thumbnail or original image as a data URL.
+///
+/// The frontend never receives a filesystem path here; the row is looked up by
+/// ID and the stored path is checked against the app data directory in Rust.
+#[tauri::command]
+pub fn get_screenshot_image(
+    id: String,
+    variant: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<ScreenshotImageData> {
+    let variant = ScreenshotVariant::parse(&variant)?;
+    let service = ScreenshotService::new(&state.pool, &state.paths);
+    service.load_image(&id, variant)
 }
 
 #[tauri::command]
@@ -268,11 +288,9 @@ pub fn crop_screenshot(
 #[tauri::command]
 pub fn copy_screenshot_image(id: String, state: tauri::State<'_, AppState>) -> Result<bool> {
     let service = ScreenshotService::new(&state.pool, &state.paths);
-    let entry = service
-        .get(&id)?
-        .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+    let original = service.original_file(&id)?;
 
-    let image = image::open(&entry.original_path)?.to_rgba8();
+    let image = image::open(original)?.to_rgba8();
     crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
 
     Ok(true)
@@ -284,6 +302,7 @@ pub fn export_screenshot(id: String, state: tauri::State<'_, AppState>) -> Resul
     let entry = service
         .get(&id)?
         .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+    let original = service.original_file(&id)?;
 
     let export_root = directories::UserDirs::new()
         .and_then(|dirs| dirs.download_dir().map(|path| path.to_path_buf()))
@@ -293,7 +312,7 @@ pub fn export_screenshot(id: String, state: tauri::State<'_, AppState>) -> Resul
     fs::create_dir_all(&target_dir)?;
 
     let target = target_dir.join(format!("LucidClip_{}.png", entry.id));
-    fs::copy(&entry.original_path, &target)?;
+    fs::copy(original, &target)?;
 
     Ok(target.to_string_lossy().into_owned())
 }

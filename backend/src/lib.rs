@@ -219,6 +219,7 @@ pub fn run() {
             commands::toggle_clipboard_favorite,
             commands::clear_clipboard_history,
             commands::get_screenshots,
+            commands::get_screenshot_image,
             commands::capture_screenshot,
             commands::crop_screenshot,
             commands::copy_screenshot_image,
