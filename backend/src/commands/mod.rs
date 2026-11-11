@@ -1,6 +1,6 @@
 //! Tauri IPC Command Handlers
 
-use crate::clipboard::ClipboardService;
+use crate::clipboard::{media, ClipboardService};
 use crate::database::{DbClipboardEntry, DbScreenshotEntry, SettingsRepo};
 use crate::errors::{AppError, Result};
 use crate::screenshots::{
@@ -233,6 +233,41 @@ pub fn get_screenshot_image(
     let variant = ScreenshotVariant::parse(&variant)?;
     let service = ScreenshotService::new(&state.pool, &state.paths);
     service.load_image(&id, variant)
+}
+
+/// Return a validated clipboard image as a data URL.
+///
+/// Only rows with `content_type = "image"` are accepted, and the stored file
+/// must still resolve inside the application data directory.
+#[tauri::command]
+pub fn get_clipboard_image(
+    id: String,
+    variant: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<ScreenshotImageData> {
+    let service = ClipboardService::with_paths(&state.pool, &state.paths);
+    let entry = service
+        .get_entry_by_id(&id)?
+        .ok_or_else(|| AppError::NotFound(format!("Clipboard entry {id} not found")))?;
+
+    if entry.content_type != "image" {
+        return Err(AppError::InvalidInput(format!(
+            "Clipboard entry {id} is not an image"
+        )));
+    }
+
+    let thumbnail = match variant.as_str() {
+        "thumbnail" => true,
+        "original" => false,
+        other => {
+            return Err(AppError::InvalidInput(format!(
+                "Unsupported clipboard image variant: {other}"
+            )))
+        }
+    };
+
+    let path = media::resolve_image_file(&state.paths, &entry, thumbnail)?;
+    crate::screenshots::service::image_data_url(&path)
 }
 
 #[tauri::command]
