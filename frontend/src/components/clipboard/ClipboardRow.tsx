@@ -16,6 +16,7 @@ import {
   Files,
 } from 'lucide-react';
 import { useApp } from '@/context';
+import { useMediaImageUrl } from '@/hooks';
 
 export interface ClipboardRowProps {
   entry: ClipboardEntry;
@@ -32,6 +33,12 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
 }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const clipboardImage = useMediaImageUrl(
+    'clipboard',
+    entry.id,
+    'thumbnail',
+    entry.contentType === 'image' && !!entry.thumbnailPath
+  );
 
   const asHistoryItem: HistoryItem = { kind: 'clipboard', ...entry };
 
@@ -129,9 +136,11 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
       >
         {/* Left: Type badge + text preview */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {entry.contentType === 'image' && entry.thumbnailUrl ? (
+          {entry.contentType === 'image' &&
+          clipboardImage.state === 'ready' &&
+          clipboardImage.url ? (
             <img
-              src={entry.thumbnailUrl}
+              src={clipboardImage.url}
               alt="Clipboard image thumbnail"
               className="h-8 w-11 shrink-0 rounded-[3px] border border-graphite-border object-cover"
               loading="lazy"

@@ -1,6 +1,6 @@
 //! Tauri Native Clipboard Service Implementation
 
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { IClipboardService } from '../contracts';
 import {
   ClipboardContentType,
@@ -52,8 +52,8 @@ export function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
     sourceApp: dto.source_app,
     imagePath: dto.image_path,
     thumbnailPath: dto.thumbnail_path,
-    imageUrl: dto.image_path ? convertFileSrc(dto.image_path) : undefined,
-    thumbnailUrl: dto.thumbnail_path ? convertFileSrc(dto.thumbnail_path) : undefined,
+    imageUrl: undefined,
+    thumbnailUrl: undefined,
     imageWidth: dto.image_width,
     imageHeight: dto.image_height,
     byteSize: dto.byte_size,

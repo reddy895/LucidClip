@@ -1,6 +1,6 @@
 //! Tauri Native Screenshot Service Implementation
 
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { IScreenshotService } from '../contracts';
 import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/types';
 
@@ -40,10 +40,9 @@ function mapDtoToEntry(dto: DbScreenshotDto): ScreenshotEntry {
 
   return {
     id: dto.id,
-    // Screenshot files live outside the webview origin, so they must be
-    // served through Tauri's scoped asset protocol.
-    thumbnailUrl: convertFileSrc(dto.thumbnail_path),
-    fullImageUrl: convertFileSrc(dto.original_path),
+    // Image bytes are fetched on demand through the validated IPC command.
+    thumbnailUrl: undefined,
+    fullImageUrl: undefined,
     thumbnailAvailable: dto.thumbnail_available,
     originalAvailable: dto.original_available,
     width: dto.width,

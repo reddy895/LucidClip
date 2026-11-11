@@ -17,6 +17,7 @@ import {
   Files,
 } from 'lucide-react';
 import { useApp } from '@/context';
+import { useMediaImageUrl } from '@/hooks';
 
 export interface UnifiedHistoryRowProps {
   item: HistoryItem;
@@ -40,6 +41,10 @@ export const UnifiedHistoryRow: React.FC<UnifiedHistoryRowProps> = ({
   };
 
   const isClipboard = item.kind === 'clipboard';
+  const imageEnabled = isClipboard
+    ? item.contentType === 'image' && !!item.thumbnailPath
+    : true;
+  const thumbnail = useMediaImageUrl(item.kind, item.id, 'thumbnail', imageEnabled);
 
   const typeConfig = {
     text: { label: 'TXT', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
@@ -126,10 +131,10 @@ export const UnifiedHistoryRow: React.FC<UnifiedHistoryRowProps> = ({
       >
         {/* Left: Thumbnail/Type Badge + Content Preview */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {!isClipboard || (item.contentType === 'image' && item.thumbnailUrl) ? (
+          {imageEnabled && thumbnail.state === 'ready' && thumbnail.url ? (
             <div className="relative h-6 w-9 shrink-0 overflow-hidden rounded-[3px] border border-graphite-border bg-[#151719]">
               <img
-                src={item.thumbnailUrl}
+                src={thumbnail.url}
                 alt={isClipboard ? 'Clipboard image thumbnail' : 'Screenshot thumbnail'}
                 className="h-full w-full object-cover"
                 loading="lazy"

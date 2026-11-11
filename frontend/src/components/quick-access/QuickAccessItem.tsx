@@ -3,6 +3,7 @@ import { HistoryItem } from '@/types';
 import { cn, formatRelativeTime, truncate } from '@/utils';
 import { Badge } from '@/components/ui';
 import { HighlightText } from '@/components/search';
+import { useMediaImageUrl } from '@/hooks';
 import { FileText, Code, Link as LinkIcon, Camera, Pin, Star, Image as ImageIcon, Files } from 'lucide-react';
 
 export interface QuickAccessItemProps {
@@ -21,6 +22,10 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
   onExecute,
 }) => {
   const isClipboard = item.kind === 'clipboard';
+  const imageEnabled = isClipboard
+    ? item.contentType === 'image' && !!item.thumbnailPath
+    : true;
+  const thumbnail = useMediaImageUrl(item.kind, item.id, 'thumbnail', imageEnabled);
 
   const typeConfig = {
     text: { label: 'TXT', icon: <FileText className="h-3 w-3" />, variant: 'default' as const },
@@ -61,10 +66,10 @@ export const QuickAccessItem: React.FC<QuickAccessItemProps> = ({
       )}
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {isClipboard && item.contentType === 'image' && item.thumbnailUrl ? (
+        {imageEnabled && thumbnail.state === 'ready' && thumbnail.url ? (
           <img
-            src={item.thumbnailUrl}
-            alt="Clipboard image thumbnail"
+            src={thumbnail.url}
+            alt={isClipboard ? 'Clipboard image thumbnail' : 'Screenshot thumbnail'}
             className="h-7 w-10 shrink-0 rounded-[3px] border border-graphite-border object-cover"
             loading="lazy"
           />
