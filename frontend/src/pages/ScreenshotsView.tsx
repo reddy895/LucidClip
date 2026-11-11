@@ -5,33 +5,52 @@ import { SearchEmptyState } from '@/components/search';
 import { ScreenshotGrid } from '@/components/screenshots/ScreenshotGrid';
 import { Camera, Crop, Image as ImageIcon } from 'lucide-react';
 import { useListKeyboardNavigation } from '@/hooks';
+import { buildGalleryItems, selectClipboardImages } from '@/utils';
 
 export const ScreenshotsView: React.FC = () => {
   const {
     screenshotItems,
+    clipboardItems,
     captureScreenshot,
     setIsPreviewVisible,
   } = useApp();
 
   const [query, setQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'fullscreen' | 'region'>('all');
+  const [filterType, setFilterType] = useState<
+    'all' | 'fullscreen' | 'region' | 'clipboard'
+  >('all');
   const [isCapturing, setIsCapturing] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return screenshotItems.filter((shot) => {
-      if (filterType !== 'all' && shot.captureType !== filterType) return false;
-      if (q) {
-        return shot.captureType.toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [screenshotItems, query, filterType]);
-
-  const historyItems = useMemo(
-    () => filtered.map((s) => ({ kind: 'screenshot' as const, ...s })),
-    [filtered]
+  const galleryItems = useMemo(
+    () => buildGalleryItems(screenshotItems, selectClipboardImages(clipboardItems)),
+    [screenshotItems, clipboardItems]
   );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase().replace(/\s/g, '');
+    return galleryItems.filter((item) => {
+      if (filterType !== 'all') {
+        if (filterType === 'clipboard') {
+          if (item.source !== 'clipboard') return false;
+        } else if (item.source !== 'screenshot' || item.captureType !== filterType) {
+          return false;
+        }
+      }
+      if (!q) return true;
+
+      const dimensions = `${item.width}x${item.height}`.toLowerCase();
+      if (item.source === 'clipboard') {
+        return 'clipboard image'.replace(/\s/g, '').includes(q) || dimensions.includes(q);
+      }
+      return (
+        (item.ocrText?.toLowerCase().includes(q) ?? false) ||
+        item.captureType.toLowerCase().includes(q) ||
+        dimensions.includes(q)
+      );
+    });
+  }, [galleryItems, query, filterType]);
+
+  const historyItems = useMemo(() => filtered.map((item) => item.historyItem), [filtered]);
 
   useListKeyboardNavigation({ items: historyItems });
 
@@ -52,7 +71,7 @@ export const ScreenshotsView: React.FC = () => {
       {/* Page Header */}
       <SectionHeader
         title="Screenshots"
-        description="Desktop snapshots stored locally on this device."
+        description="Desktop captures and clipboard images stored locally on this device."
         badge={
           <Badge variant="default" size="sm" className="font-mono">
             {filtered.length}
@@ -89,12 +108,12 @@ export const ScreenshotsView: React.FC = () => {
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Filter by capture type..."
+            placeholder="Filter by capture type or dimensions..."
             shortcutBadge="/"
           />
         </div>
         <div className="flex items-center gap-1">
-          {(['all', 'fullscreen', 'region'] as const).map((type) => (
+          {(['all', 'fullscreen', 'region', 'clipboard'] as const).map((type) => (
             <button
               key={type}
               type="button"
@@ -105,7 +124,7 @@ export const ScreenshotsView: React.FC = () => {
                   : 'bg-transparent text-graphite-text-muted hover:text-graphite-text-primary hover:bg-graphite-hover border border-transparent'
               }`}
             >
-              {type === 'all' ? 'All Types' : type}
+              {type === 'all' ? 'All Types' : type === 'clipboard' ? 'Clipboard' : type}
             </button>
           ))}
         </div>
@@ -119,8 +138,8 @@ export const ScreenshotsView: React.FC = () => {
           ) : (
             <EmptyState
               icon={<ImageIcon className="h-5 w-5" />}
-              title="No screenshots captured yet."
-              description="Capture full-screen or region snapshots to archive and extract searchable text."
+              title="No images captured yet."
+              description="Capture a screenshot or copy an image to see it in this gallery."
               action={
                 <Button
                   variant="primary"
@@ -135,7 +154,7 @@ export const ScreenshotsView: React.FC = () => {
           )
         ) : (
           <ScreenshotGrid
-            screenshots={filtered}
+            items={filtered}
             onOpenPreview={() => setIsPreviewVisible(true)}
           />
         )}

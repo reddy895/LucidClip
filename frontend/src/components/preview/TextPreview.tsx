@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ClipboardEntry, HistoryItem } from '@/types';
 import { formatBytes, formatFullDateTime, formatRelativeTime } from '@/utils';
 import { Badge, Button, Tooltip } from '@/components/ui';
 import { CodeSnippetPreview } from '@/components/clipboard/CodeSnippetPreview';
 import { UrlPreview } from '@/components/clipboard/UrlPreview';
-import { Copy, Pin, Star, Trash2, Calendar, AppWindow, AlignLeft, Hash } from 'lucide-react';
+import {
+  Copy,
+  Pin,
+  Star,
+  Trash2,
+  Calendar,
+  AppWindow,
+  AlignLeft,
+  Hash,
+  ImageOff,
+  Loader2,
+} from 'lucide-react';
 import { useApp } from '@/context';
+import { clipboardService } from '@/services';
 
 export interface TextPreviewProps {
   entry: ClipboardEntry;
@@ -14,6 +26,36 @@ export interface TextPreviewProps {
 export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
   const asHistoryItem: HistoryItem = { kind: 'clipboard', ...entry };
+  const [imageUrl, setImageUrl] = useState<string | undefined>(entry.imageUrl);
+  const [imageState, setImageState] = useState<'idle' | 'loading' | 'ready' | 'error'>(
+    entry.contentType === 'image' ? (entry.imageUrl ? 'ready' : 'loading') : 'idle'
+  );
+
+  useEffect(() => {
+    if (entry.contentType !== 'image') {
+      setImageState('idle');
+      return;
+    }
+
+    let active = true;
+    setImageState('loading');
+    clipboardService
+      .getClipboardImageUrl(entry.id, 'original')
+      .then((url) => {
+        if (!active) return;
+        setImageUrl(url);
+        setImageState('ready');
+      })
+      .catch(() => {
+        if (!active) return;
+        setImageUrl(undefined);
+        setImageState('error');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [entry.id, entry.contentType]);
 
   return (
     <div className="flex flex-col h-full p-4 gap-4 select-none">
@@ -90,16 +132,28 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
 
           {entry.contentType === 'image' ? (
             <div className="rounded-btn border border-graphite-border bg-[#151719] p-2">
-              {entry.imageUrl ? (
+              {imageState === 'ready' && imageUrl ? (
                 <img
-                  src={entry.imageUrl}
+                  src={imageUrl}
                   alt="Clipboard preview"
                   className="mx-auto max-h-[420px] max-w-full rounded-[3px] object-contain"
+                  onError={() => {
+                    setImageUrl(undefined);
+                    setImageState('error');
+                  }}
                 />
+              ) : imageState === 'loading' ? (
+                <div className="flex min-h-[160px] items-center justify-center gap-2 text-xs text-graphite-text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading image...
+                </div>
               ) : (
-                <p className="p-3 text-xs text-status-error">
-                  The stored image file is unavailable.
-                </p>
+                <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 p-4 text-center text-graphite-text-muted">
+                  <ImageOff className="h-5 w-5" />
+                  <p className="text-xs text-status-error">
+                    The stored image file is unavailable.
+                  </p>
+                </div>
               )}
             </div>
           ) : entry.contentType === 'files' ? (
