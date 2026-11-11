@@ -67,3 +67,27 @@ directory.
 6. Missing files render an explicit, non-crashing state.
 
 No schema change is required and existing rows/files are preserved.
+
+## Resolution status
+
+Implemented:
+
+- `ClipboardView` uses `selectTextEntries`, so image-only clipboard rows no longer
+  appear in the text history.
+- `ScreenshotsView` uses `buildGalleryItems` to merge LucidClip screenshots and
+  clipboard images, with `screenshot`, `fullscreen`, `region`, and `clipboard`
+  filters plus origin badges.
+- `get_screenshots` returns availability flags and never serializes absolute
+  screenshot paths.
+- `get_screenshot_image` and `get_clipboard_image` validate the row and file
+  before returning a data URL; thumbnails are regenerated when possible.
+- Every thumbnail consumer (`ScreenshotGrid`, `ClipboardRow`,
+  `UnifiedHistoryRow`, `QuickAccessItem`) loads images through
+  `useMediaImageUrl`, not `convertFileSrc`.
+- Full previews and region-capture sources load only when needed.
+- Delete/crop re-validate stored paths before touching files.
+- Regression coverage includes path ownership, gallery health, thumbnail
+  regeneration, restart persistence, missing media, and text/gallery separation.
+
+Limitation: native screenshot capture remains Windows-only, so actual desktop
+capture could not be exercised on the Linux development host.

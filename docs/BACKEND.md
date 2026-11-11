@@ -111,13 +111,15 @@ The registered handlers in `backend/src/commands/mod.rs` are:
 
 ## 7. Screenshot Asset Delivery
 
-Screenshot files live outside the webview origin, so absolute filesystem paths cannot be loaded directly by an `<img>` element. The desktop build:
+Stored images are never addressed by filesystem path in the frontend. The desktop build:
 
-- Enables the Tauri `protocol-asset` crate feature in `backend/Cargo.toml`.
-- Enables `app.security.assetProtocol` in `backend/tauri.conf.json` with a scope limited to the LucidClip screenshot directories for both Windows (`%LOCALAPPDATA%/LucidClip`) and the Linux development data directory.
-- Converts `original_path`, `thumbnail_path`, and clipboard image paths with `convertFileSrc` inside the Tauri services.
+- Resolves the screenshot or clipboard row by ID in the Rust backend.
+- Validates that the stored path is owned by `<app-data>/screenshots`.
+- Canonicalizes the path so symlinks cannot escape the managed directory.
+- Returns a PNG data URL for `thumbnail` or `original` variants through `get_screenshot_image` and `get_clipboard_image`.
+- Omits raw screenshot paths from serialized gallery payloads.
 
-No screenshot directory outside the application data root is exposed to the webview.
+The frontend loads thumbnails lazily per row/card and requests full-resolution data only for the selected preview. Missing files produce an explicit error state instead of a silent broken image. The legacy `assetProtocol` scope remains configured for compatibility but is no longer used for image rendering.
 
 ## 8. Clipboard Restoration
 

@@ -40,7 +40,8 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 - Persists dimensions, file size, capture type, and screen-relative region bounds.
 - Supports pin, favorite, delete, copy-image-to-clipboard through `CF_DIB`, and PNG export to the Downloads folder.
 - Removes image files only after the database row is deleted, avoiding gallery records that point at missing files.
-- Clipboard images share the same scoped storage directories but never appear in the screenshot gallery.
+- Clipboard images are merged into the Screenshots gallery with a `Clipboard` origin badge; they never appear in the text history.
+- Gallery cards load thumbnails on demand, while full-resolution images are requested only for the selected preview.
 
 ### Settings and storage
 
@@ -116,7 +117,7 @@ LucidClip/
 └── logs/                   Reserved for diagnostics
 ```
 
-Clipboard contents are never written to diagnostic logs. Screenshot files are exposed to the webview only through Tauri's scoped asset protocol.
+Clipboard contents are never written to diagnostic logs. Image bytes are fetched by ID through validated Tauri IPC commands that reject paths outside the screenshot storage root; raw filesystem paths are not sent to the webview.
 
 ---
 
@@ -141,7 +142,7 @@ flowchart LR
     IPC --> CAP
     IPC --> DB
     IPC --> FILES
-    UI -->|scoped asset protocol| FILES
+    UI -->|validated image IPC| FILES
 ```
 
 - The clipboard monitor listens for native Windows or GTK change notifications, debounces bursts, and keeps a two-second safety pass plus a polling fallback; pause, exclusion, and retention settings apply before persistence.

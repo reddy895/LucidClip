@@ -461,9 +461,9 @@ export const SettingsView: React.FC = () => {
                     Local image storage
                   </p>
                   <p className="text-graphite-text-muted leading-relaxed">
-                    Originals and thumbnails are written to the app data directory and served
-                    through Tauri's scoped asset protocol. Screenshot text extraction is not
-                    available in this build, so captures are stored as images only.
+                    Originals and thumbnails are written to the app data directory and loaded
+                    through validated, on-demand IPC commands. Screenshot text extraction is
+                    not available in this build, so captures are stored as images only.
                   </p>
                 </div>
               </SettingsSection>

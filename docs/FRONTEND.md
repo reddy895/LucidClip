@@ -52,7 +52,7 @@ The interface uses a three-part desktop layout:
 +------------------+------------------------------------+------------------+
 |                  |  Section Title        Search & Sort|                  |
 |  All Items       |  [ Search input               / ]  |  PREVIEW PANEL   |
-|  Clipboard       |  [ All ] [ Text ] [ Code ] [ URLs ]|  Selected Item   |
+|  Clipboard       |  [All][Plain Text][Code][URLs][Files] | Selected Item  |
 |  Screenshots     |                                    |                  |
 |  Pinned          |  Chrono History Feed               |  Full Content /  |
 |  Favorites       |  - Today                           |  Image Inspector |
@@ -78,8 +78,8 @@ The interface uses a three-part desktop layout:
 
 ### 2.3 Right Contextual Preview Panel (`w-[320px]–[350px]`, collapsible)
 - **Text Preview:** Syntax-highlighted code with line numbers, URL previews with domain cards, formatted full timestamps, word and character counts.
-- **Clipboard Media Preview:** Scoped images with dimensions and size, or multiline file-path lists with file counts and size.
-- **Screenshot Preview:** Aspect-ratio-preserved image, full image inspector modal, metadata, pin/favorite/delete, image clipboard copy, and PNG export.
+- **Clipboard Media Preview:** Images loaded through validated IPC with dimensions and size, or multiline file-path lists with file counts and size.
+- **Screenshot Preview:** Aspect-ratio-preserved image, full image inspector modal, metadata, pin/favorite/delete, image clipboard copy, and PNG export. The Screenshots grid merges LucidClip captures with clipboard images, labels their origin, and loads thumbnails lazily.
 
 ### 2.4 Quick Access Launcher Overlay (`Alt + Space`)
 - Centered keyboard-driven launcher modal
@@ -147,7 +147,7 @@ npm run build
 - Closing the window keeps the backend alive in the system tray; Quit from the tray menu stops it.
 - Global hotkeys are not registered; in-window shortcuts are the supported path.
 - The screenshot save directory is fixed to the application data folder.
-- Native clipboard, screenshot, and startup paths require Windows and cannot be fully validated in a Linux frontend build.
-- Clipboard images and file lists are captured only on Windows; Linux builds do not inspect the clipboard.
+- LucidClip screenshot capture, launch-at-login, and foreground-app exclusions require Windows and cannot be fully validated in a Linux frontend build.
+- Clipboard text capture is available on Windows and Linux; clipboard media capture support varies by platform. The browser development build uses local adapters and refuses native operations.
 
 Unsupported browser development operations return explicit errors rather than generated screenshots or fake OCR.
