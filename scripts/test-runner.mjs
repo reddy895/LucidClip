@@ -197,9 +197,18 @@ describe('LucidClip Core Integrity Verification', () => {
       path.join(rootDir, 'frontend/src/services/tauri/TauriClipboardService.ts'),
       'utf8'
     );
-    for (const marker of ['image_path', 'thumbnail_path', 'convertFileSrc', 'copy_clipboard_entry_by_id']) {
+    for (const marker of [
+      'image_path',
+      'thumbnail_path',
+      'get_clipboard_image',
+      'copy_clipboard_entry_by_id',
+    ]) {
       assert.ok(frontendService.includes(marker), `Frontend clipboard service must use ${marker}`);
     }
+    assert.ok(
+      !frontendService.includes('convertFileSrc'),
+      'Frontend clipboard images must load through validated IPC, not the asset protocol'
+    );
   });
 
   test('Clipboard event envelope validation rejects malformed payloads', async () => {
@@ -355,6 +364,79 @@ describe('LucidClip Core Integrity Verification', () => {
     ]) {
       assert.ok(contextSource.includes(marker), `AppContext must use ${marker}`);
     }
+  });
+
+  test('Text history and screenshot gallery keep separate image contracts', async () => {
+    const filters = await loadTsModule('frontend/src/utils/historyFilters.ts');
+    const { buildGalleryItems } = await loadTsModule('frontend/src/utils/gallery.ts');
+
+    const entries = [
+      { id: 'text-1', contentType: 'plain' },
+      { id: 'image-1', contentType: 'image' },
+      { id: 'code-1', contentType: 'code' },
+      { id: 'files-1', contentType: 'files' },
+    ];
+
+    assert.deepEqual(
+      filters.selectTextEntries(entries).map((entry) => entry.id),
+      ['text-1', 'code-1', 'files-1'],
+      'The text view must exclude image-only clipboard rows'
+    );
+    assert.deepEqual(
+      filters.selectClipboardImages(entries).map((entry) => entry.id),
+      ['image-1'],
+      'The image gallery must select only image clipboard rows'
+    );
+
+    const screenshots = [
+      {
+        id: 'shot-1',
+        createdAt: '2026-01-01T00:00:01.000Z',
+        width: 1920,
+        height: 1080,
+        fileSizeBytes: 4096,
+        isPinned: false,
+        isFavorite: true,
+        captureType: 'region',
+        thumbnailAvailable: false,
+        originalAvailable: true,
+        ocrText: null,
+      },
+    ];
+    const clipboardImages = [
+      {
+        id: 'clip-1',
+        createdAt: '2026-01-01T00:00:02.000Z',
+        content: '',
+        contentType: 'image',
+        imageWidth: 640,
+        imageHeight: 480,
+        byteSize: 2048,
+        imagePath: '/tmp/clip.png',
+        thumbnailPath: '/tmp/clip-thumb.png',
+        isPinned: true,
+        isFavorite: false,
+      },
+    ];
+
+    const items = buildGalleryItems(screenshots, clipboardImages);
+    assert.deepEqual(
+      items.map((item) => item.id),
+      ['clip-1', 'shot-1'],
+      'Gallery items must be ordered newest first'
+    );
+
+    const [clipboardItem, screenshotItem] = items;
+    assert.equal(clipboardItem.source, 'clipboard');
+    assert.equal(clipboardItem.historyItem.kind, 'clipboard');
+    assert.equal(clipboardItem.captureType, 'clipboard');
+    assert.equal(clipboardItem.thumbnailAvailable, true);
+    assert.equal(clipboardItem.originalAvailable, true);
+
+    assert.equal(screenshotItem.source, 'screenshot');
+    assert.equal(screenshotItem.historyItem.kind, 'screenshot');
+    assert.equal(screenshotItem.thumbnailAvailable, false);
+    assert.equal(screenshotItem.originalAvailable, true);
   });
 
   test('Rust Backend Unit Tests: SQLite migrations, classification, and deduplication pass', () => {
