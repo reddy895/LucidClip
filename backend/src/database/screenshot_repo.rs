@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbScreenshotEntry {
     pub id: String,
+    #[serde(skip_serializing)]
     pub original_path: String,
+    #[serde(skip_serializing)]
     pub thumbnail_path: String,
     pub width: u32,
     pub height: u32,

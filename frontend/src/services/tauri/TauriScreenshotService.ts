@@ -6,8 +6,6 @@ import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/
 
 interface DbScreenshotDto {
   id: string;
-  original_path: string;
-  thumbnail_path: string;
   width: number;
   height: number;
   file_size: number;

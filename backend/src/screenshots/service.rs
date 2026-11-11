@@ -549,6 +549,38 @@ mod tests {
     }
 
     #[test]
+    fn gallery_serialization_omits_absolute_file_paths() {
+        let root = std::env::temp_dir().join(format!(
+            "lucidclip-shot-serde-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let paths = AppPaths::from_root(&root);
+        paths.ensure_dirs_exist().unwrap();
+
+        let pool = DbPool::open_in_memory().unwrap();
+        run_migrations(&pool).unwrap();
+        let service = ScreenshotService::new(&pool, &paths);
+
+        let entry = service
+            .store(test_image(20, 20), "fullscreen", None)
+            .unwrap();
+        let id = entry.id.clone();
+        let value = serde_json::to_value(ScreenshotGalleryEntry {
+            entry,
+            thumbnail_available: true,
+            original_available: true,
+        })
+        .unwrap();
+
+        assert_eq!(value["id"], id);
+        assert!(value.get("original_path").is_none());
+        assert!(value.get("thumbnail_path").is_none());
+        assert_eq!(value["thumbnail_available"], true);
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
     fn gallery_regenerates_a_missing_thumbnail_and_loads_it() {
         let root = std::env::temp_dir().join(format!(
             "lucidclip-gallery-test-{}",
