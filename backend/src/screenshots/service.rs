@@ -1,7 +1,7 @@
 //! Screenshot capture, thumbnail generation, and persistence.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
@@ -89,7 +89,10 @@ impl<'a> ScreenshotService<'a> {
             .find_by_id(source_id)?
             .ok_or_else(|| AppError::NotFound(format!("Screenshot {source_id} not found")))?;
 
-        let dynamic = image::open(&source.original_path)?;
+        let source_path = self
+            .paths
+            .resolve_media_file(Path::new(&source.original_path))?;
+        let dynamic = image::open(source_path)?;
         let (source_width, source_height) = dynamic.dimensions();
         validate_crop_region(source_width, source_height, region)?;
 
@@ -198,6 +201,26 @@ impl<'a> ScreenshotService<'a> {
         self.repo.find_by_id(id)
     }
 
+    /// Resolve the validated original file for a screenshot row.
+    pub fn original_file(&self, id: &str) -> Result<PathBuf> {
+        let entry = self
+            .repo
+            .find_by_id(id)?
+            .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+        self.paths
+            .resolve_media_file(Path::new(&entry.original_path))
+    }
+
+    /// Resolve the validated thumbnail file for a screenshot row.
+    pub fn thumbnail_file(&self, id: &str) -> Result<PathBuf> {
+        let entry = self
+            .repo
+            .find_by_id(id)?
+            .ok_or_else(|| AppError::NotFound(format!("Screenshot {id} not found")))?;
+        self.paths
+            .resolve_media_file(Path::new(&entry.thumbnail_path))
+    }
+
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
         self.repo.toggle_pin(id)
     }
@@ -219,16 +242,8 @@ impl<'a> ScreenshotService<'a> {
 
         let deleted = self.repo.delete(id)?;
         if deleted {
-            if let Err(err) = fs::remove_file(&entry.original_path) {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    eprintln!("[LucidClip Screenshots] Failed to remove original image: {err}");
-                }
-            }
-            if let Err(err) = fs::remove_file(&entry.thumbnail_path) {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    eprintln!("[LucidClip Screenshots] Failed to remove thumbnail image: {err}");
-                }
-            }
+            remove_owned_file(self.paths, &entry.original_path, "original");
+            remove_owned_file(self.paths, &entry.thumbnail_path, "thumbnail");
         }
 
         Ok(deleted)
@@ -241,6 +256,19 @@ fn remove_file_if_exists(path: &Path) {
             eprintln!("[LucidClip Screenshots] Failed to clean up image file: {err}");
         }
     }
+}
+
+/// Delete a row-owned file only when the stored path is inside the app data
+/// directory. Malformed or tampered database rows cannot delete arbitrary files.
+fn remove_owned_file(paths: &AppPaths, candidate: &str, label: &str) {
+    let path = Path::new(candidate);
+    if !paths.owns_media_path(path) {
+        eprintln!(
+            "[LucidClip Screenshots] Refusing to remove {label} outside the app data directory: {candidate}"
+        );
+        return;
+    }
+    remove_file_if_exists(path);
 }
 
 fn validate_crop_region(
