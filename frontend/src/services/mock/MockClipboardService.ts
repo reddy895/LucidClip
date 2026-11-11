@@ -3,6 +3,7 @@ import {
   ClipboardDiagnostics,
   ClipboardEntry,
   ClipboardMonitorStatus,
+  ImageVariant,
 } from '@/types';
 import { copyTextToClipboard, detectContentType } from '@/utils';
 
@@ -50,6 +51,17 @@ export class MockClipboardService implements IClipboardService {
     const list = this.load();
     const found = list.find((item) => item.id === id);
     return Promise.resolve(found ? { ...found } : null);
+  }
+
+  async getClipboardImageUrl(id: string, variant: ImageVariant): Promise<string> {
+    const found = await this.getEntryById(id);
+    const url = variant === 'thumbnail' ? found?.thumbnailUrl : found?.imageUrl;
+    if (!url) throw new Error('Clipboard images require the LucidClip desktop application.');
+    return url;
+  }
+
+  clearImageCache(): void {
+    // Browser preview data is already held in memory.
   }
 
   async copyEntryById(id: string): Promise<boolean> {

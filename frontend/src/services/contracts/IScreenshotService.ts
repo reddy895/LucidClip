@@ -1,8 +1,10 @@
-import { CaptureType, ScreenshotEntry, ScreenshotRegion } from '@/types';
+import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/types';
 
 export interface IScreenshotService {
   getScreenshots(): Promise<ScreenshotEntry[]>;
   getScreenshotById(id: string): Promise<ScreenshotEntry | null>;
+  getScreenshotImageUrl(id: string, variant: ImageVariant): Promise<string>;
+  clearImageCache(id?: string): void;
   captureScreen(type: CaptureType): Promise<ScreenshotEntry>;
   beginRegionCapture(): Promise<ScreenshotEntry>;
   cropScreenshot(

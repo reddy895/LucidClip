@@ -1,5 +1,6 @@
 export type OcrStatus = 'none' | 'pending' | 'completed' | 'failed';
 export type CaptureType = 'fullscreen' | 'region';
+export type ImageVariant = 'thumbnail' | 'original';
 
 export interface ScreenshotRegion {
   x: number;
@@ -10,8 +11,10 @@ export interface ScreenshotRegion {
 
 export interface ScreenshotEntry {
   id: string;
-  thumbnailUrl: string;
-  fullImageUrl: string;
+  thumbnailUrl?: string;
+  fullImageUrl?: string;
+  thumbnailAvailable?: boolean;
+  originalAvailable?: boolean;
   width: number;
   height: number;
   fileSizeBytes: number;

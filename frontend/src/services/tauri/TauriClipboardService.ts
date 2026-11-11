@@ -7,6 +7,7 @@ import {
   ClipboardDiagnostics,
   ClipboardEntry,
   ClipboardMonitorStatus,
+  ImageVariant,
 } from '@/types';
 
 export interface DbClipboardDto {
@@ -64,10 +65,38 @@ export function mapDtoToEntry(dto: DbClipboardDto): ClipboardEntry {
   };
 }
 
+const imageCache = new Map<string, Promise<string>>();
+
+function cacheKey(id: string, variant: ImageVariant): string {
+  return `${variant}:${id}`;
+}
+
 export class TauriClipboardService implements IClipboardService {
   async getHistory(): Promise<ClipboardEntry[]> {
     const list = await invoke<DbClipboardDto[]>('get_clipboard_entries');
     return list.map(mapDtoToEntry);
+  }
+
+  async getClipboardImageUrl(id: string, variant: ImageVariant): Promise<string> {
+    const key = cacheKey(id, variant);
+    const cached = imageCache.get(key);
+    if (cached) return cached;
+
+    const request = invoke<string>('get_clipboard_image', { id, variant }).catch((err) => {
+      imageCache.delete(key);
+      throw err;
+    });
+    imageCache.set(key, request);
+    return request;
+  }
+
+  clearImageCache(id?: string): void {
+    if (!id) {
+      imageCache.clear();
+      return;
+    }
+    imageCache.delete(cacheKey(id, 'thumbnail'));
+    imageCache.delete(cacheKey(id, 'original'));
   }
 
   async getEntryById(id: string): Promise<ClipboardEntry | null> {
@@ -98,11 +127,14 @@ export class TauriClipboardService implements IClipboardService {
   }
 
   async deleteEntry(id: string): Promise<boolean> {
-    return await invoke<boolean>('delete_clipboard_entry', { id });
+    const deleted = await invoke<boolean>('delete_clipboard_entry', { id });
+    if (deleted) this.clearImageCache(id);
+    return deleted;
   }
 
   async clearHistory(): Promise<void> {
     await invoke<number>('clear_clipboard_history');
+    this.clearImageCache();
   }
 
   async addEntry(content: string, sourceApp?: string): Promise<ClipboardEntry> {

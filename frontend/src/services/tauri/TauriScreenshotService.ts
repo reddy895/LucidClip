@@ -2,7 +2,7 @@
 
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { IScreenshotService } from '../contracts';
-import { CaptureType, ScreenshotEntry, ScreenshotRegion } from '@/types';
+import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/types';
 
 interface DbScreenshotDto {
   id: string;
@@ -16,6 +16,8 @@ interface DbScreenshotDto {
   pinned: boolean;
   favorite: boolean;
   capture_type: string;
+  thumbnail_available?: boolean;
+  original_available?: boolean;
   region_x?: number | null;
   region_y?: number | null;
   region_width?: number | null;
@@ -42,6 +44,8 @@ function mapDtoToEntry(dto: DbScreenshotDto): ScreenshotEntry {
     // served through Tauri's scoped asset protocol.
     thumbnailUrl: convertFileSrc(dto.thumbnail_path),
     fullImageUrl: convertFileSrc(dto.original_path),
+    thumbnailAvailable: dto.thumbnail_available,
+    originalAvailable: dto.original_available,
     width: dto.width,
     height: dto.height,
     fileSizeBytes: dto.file_size,
@@ -55,10 +59,38 @@ function mapDtoToEntry(dto: DbScreenshotDto): ScreenshotEntry {
   };
 }
 
+const imageCache = new Map<string, Promise<string>>();
+
+function cacheKey(id: string, variant: ImageVariant): string {
+  return `${variant}:${id}`;
+}
+
 export class TauriScreenshotService implements IScreenshotService {
   async getScreenshots(): Promise<ScreenshotEntry[]> {
     const list = await invoke<DbScreenshotDto[]>('get_screenshots');
     return list.map(mapDtoToEntry);
+  }
+
+  async getScreenshotImageUrl(id: string, variant: ImageVariant): Promise<string> {
+    const key = cacheKey(id, variant);
+    const cached = imageCache.get(key);
+    if (cached) return cached;
+
+    const request = invoke<string>('get_screenshot_image', { id, variant }).catch((err) => {
+      imageCache.delete(key);
+      throw err;
+    });
+    imageCache.set(key, request);
+    return request;
+  }
+
+  clearImageCache(id?: string): void {
+    if (!id) {
+      imageCache.clear();
+      return;
+    }
+    imageCache.delete(cacheKey(id, 'thumbnail'));
+    imageCache.delete(cacheKey(id, 'original'));
   }
 
   async getScreenshotById(id: string): Promise<ScreenshotEntry | null> {
@@ -73,6 +105,7 @@ export class TauriScreenshotService implements IScreenshotService {
     const dto = await invoke<DbScreenshotDto>('capture_screenshot', {
       captureType: type,
     });
+    this.clearImageCache(dto.id);
     return mapDtoToEntry(dto);
   }
 
@@ -80,6 +113,7 @@ export class TauriScreenshotService implements IScreenshotService {
     const dto = await invoke<DbScreenshotDto>('capture_screenshot', {
       captureType: 'fullscreen',
     });
+    this.clearImageCache(dto.id);
     return mapDtoToEntry(dto);
   }
 
@@ -93,6 +127,8 @@ export class TauriScreenshotService implements IScreenshotService {
       region,
       removeSource,
     });
+    this.clearImageCache(sourceId);
+    this.clearImageCache(dto.id);
     return mapDtoToEntry(dto);
   }
 
@@ -115,7 +151,9 @@ export class TauriScreenshotService implements IScreenshotService {
   }
 
   async deleteScreenshot(id: string): Promise<boolean> {
-    return await invoke<boolean>('delete_screenshot', { id });
+    const deleted = await invoke<boolean>('delete_screenshot', { id });
+    if (deleted) this.clearImageCache(id);
+    return deleted;
   }
 
   async exportScreenshot(id: string): Promise<string> {

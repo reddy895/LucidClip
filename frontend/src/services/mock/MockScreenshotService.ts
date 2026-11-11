@@ -1,5 +1,5 @@
 import { IScreenshotService } from '../contracts';
-import { CaptureType, ScreenshotEntry, ScreenshotRegion } from '@/types';
+import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/types';
 
 const STORAGE_KEY = 'lucidclip_screenshot_history';
 
@@ -44,6 +44,17 @@ export class MockScreenshotService implements IScreenshotService {
     const list = this.load();
     const found = list.find((item) => item.id === id);
     return Promise.resolve(found ? { ...found } : null);
+  }
+
+  async getScreenshotImageUrl(id: string, variant: ImageVariant): Promise<string> {
+    const found = await this.getScreenshotById(id);
+    const url = variant === 'thumbnail' ? found?.thumbnailUrl : found?.fullImageUrl;
+    if (!url) throw new Error('Screenshot images require the LucidClip desktop application.');
+    return url;
+  }
+
+  clearImageCache(): void {
+    // Browser preview data is already held in memory.
   }
 
   async captureScreen(_type: CaptureType): Promise<ScreenshotEntry> {
