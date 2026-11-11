@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/context';
 import { Dialog, Button } from '@/components/ui';
-import { Crop } from 'lucide-react';
+import { Crop, ImageOff, Loader2 } from 'lucide-react';
+import { screenshotService } from '@/services';
 
 interface NormalizedPoint {
   x: number;
@@ -32,8 +33,52 @@ export const RegionCaptureDialog: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourceUrl, setSourceUrl] = useState<string | undefined>(
+    regionCaptureSource?.fullImageUrl
+  );
+  const [sourceState, setSourceState] = useState<'loading' | 'ready' | 'error'>(
+    regionCaptureSource?.fullImageUrl ? 'ready' : 'loading'
+  );
 
   const isOpen = regionCaptureSource !== null;
+
+  useEffect(() => {
+    let active = true;
+    const source = regionCaptureSource;
+
+    if (!source) {
+      setSourceUrl(undefined);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (source.originalAvailable === false) {
+      setSourceUrl(undefined);
+      setSourceState('error');
+      return () => {
+        active = false;
+      };
+    }
+
+    setSourceState('loading');
+    screenshotService
+      .getScreenshotImageUrl(source.id, 'original')
+      .then((url) => {
+        if (!active) return;
+        setSourceUrl(url);
+        setSourceState('ready');
+      })
+      .catch(() => {
+        if (!active) return;
+        setSourceUrl(undefined);
+        setSourceState('error');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [regionCaptureSource]);
   const selection = anchor && cursor ? toNormalizedRect(anchor, cursor) : null;
 
   const pointFromEvent = (event: React.PointerEvent): NormalizedPoint | null => {
@@ -129,13 +174,28 @@ export const RegionCaptureDialog: React.FC = () => {
               onPointerUp={handlePointerUp}
               onPointerCancel={() => setIsDragging(false)}
             >
-              <img
-                src={regionCaptureSource.fullImageUrl}
-                alt="Captured desktop for region selection"
-                className="block max-h-[60vh] w-auto max-w-full cursor-crosshair rounded-btn"
-                draggable={false}
-              />
-              {selection && selection.width > 0 && selection.height > 0 && (
+              {sourceState === 'ready' && sourceUrl ? (
+                <img
+                  src={sourceUrl}
+                  alt="Captured desktop for region selection"
+                  className="block max-h-[60vh] w-auto max-w-full cursor-crosshair rounded-btn"
+                  draggable={false}
+                />
+              ) : sourceState === 'loading' ? (
+                <div className="flex min-h-[220px] w-[420px] max-w-full flex-col items-center justify-center gap-2 text-graphite-text-muted">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-[11px]">Loading captured desktop...</span>
+                </div>
+              ) : (
+                <div className="flex min-h-[220px] w-[420px] max-w-full flex-col items-center justify-center gap-2 px-4 text-center text-graphite-text-muted">
+                  <ImageOff className="h-6 w-6" />
+                  <span className="text-xs font-medium text-graphite-text-secondary">
+                    The captured desktop image is unavailable.
+                  </span>
+                  <span className="text-[11px]">Close this dialog and try the capture again.</span>
+                </div>
+              )}
+              {sourceState === 'ready' && selection && selection.width > 0 && selection.height > 0 && (
                 <div
                   className="pointer-events-none absolute border border-accent bg-accent/20"
                   style={{
@@ -166,7 +226,7 @@ export const RegionCaptureDialog: React.FC = () => {
                 size="sm"
                 icon={<Crop className="h-3.5 w-3.5" />}
                 onClick={handleConfirm}
-                disabled={!selection || isSaving}
+                disabled={!selection || isSaving || sourceState !== 'ready'}
                 isLoading={isSaving}
               >
                 Save Region
