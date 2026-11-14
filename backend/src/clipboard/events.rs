@@ -30,6 +30,17 @@ impl ClipboardCapturedEvent {
             entry,
         }
     }
+
+    /// Return a sanitized summary for debug logs without leaking full text contents.
+    pub fn sanitized_summary(&self) -> String {
+        format!(
+            "Entry[id={}, type={}, size={}b, app={}]",
+            self.entry.id,
+            self.entry.content_type,
+            self.entry.byte_size,
+            self.entry.source_app.as_deref().unwrap_or("unknown")
+        )
+    }
 }
 
 #[cfg(test)]
@@ -68,5 +79,16 @@ mod tests {
         assert_eq!(value["entry"]["content_type"], "plain");
         assert_eq!(value["entry"]["created_at"], 1_700_000_000_000i64);
         assert_eq!(value["entry"]["pinned"], false);
+    }
+
+    #[test]
+    fn sanitized_summary_does_not_contain_raw_content() {
+        let mut entry = sample_entry();
+        entry.content = "SUPER_SECRET_TOKEN_12345".to_string();
+        let payload = ClipboardCapturedEvent::new(entry);
+        let summary = payload.sanitized_summary();
+
+        assert!(!summary.contains("SUPER_SECRET_TOKEN"));
+        assert!(summary.contains("Entry[id=clip_test"));
     }
 }
