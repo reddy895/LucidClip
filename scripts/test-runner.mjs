@@ -20,6 +20,7 @@ import './test/process-cleanup.test.mjs';
 import './test/port-sync.test.mjs';
 import './test/port-conflict-regression.test.mjs';
 import './test/launcher-lifecycle.test.mjs';
+import './test/popup-keyboard-navigation.test.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
