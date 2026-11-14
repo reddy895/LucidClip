@@ -1,6 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,32 +11,52 @@ const rootDir = path.resolve(scriptsDir, '..');
 const devScript = path.join(scriptsDir, 'dev.mjs');
 
 describe('Launcher Lifecycle and Conflict Tests', () => {
-  test('dev launcher detects active conflict and exits with code 1 without starting Tauri', () => {
-    // If port 1420 is currently occupied, running dev.mjs directly must fail cleanly
-    const result = spawnSync(process.execPath, [devScript], {
-      cwd: rootDir,
-      encoding: 'utf8',
-      env: { ...process.env, CI: 'true' },
-    });
+  test('dev launcher detects active conflict and exits with code 1 without starting Tauri', async () => {
+    // Occupy port 1420 to reliably test the pre-flight conflict detection path
+    const server = net.createServer();
+    let portOccupied = false;
 
-    // The output should either show port conflict detection OR initiate startup if port is free.
-    // If port conflict is detected:
-    if (result.status === 1 && result.stderr.includes('Conflict Detected')) {
+    try {
+      await new Promise((resolve, reject) => {
+        server.listen(1420, '127.0.0.1', () => {
+          portOccupied = true;
+          resolve();
+        });
+        server.on('error', (err) => {
+          if (err.code === 'EADDRINUSE') {
+            // Already occupied by another process, proceed to test
+            resolve();
+          } else {
+            reject(err);
+          }
+        });
+      });
+
+      const result = spawnSync(process.execPath, [devScript], {
+        cwd: rootDir,
+        encoding: 'utf8',
+        env: { ...process.env, CI: 'true' },
+        timeout: 5000,
+      });
+
+      assert.equal(result.status, 1, 'Launcher must exit with code 1 on conflict');
       assert.match(result.stderr, /\[LucidClip\] Development Server Port Conflict Detected/);
       assert.match(result.stderr, /Target Port:\s+1420/);
       assert.match(result.stderr, /Diagnostic Information:/);
       assert.match(result.stderr, /How to resolve:/);
-    } else {
-      // If port 1420 happens to be free, it should output the startup banner
-      assert.match(result.stdout, /LucidClip Desktop Development Launcher/);
+    } finally {
+      if (portOccupied) {
+        await new Promise((resolve) => server.close(resolve));
+      }
     }
   });
 
   test('launcher cleanly validates arguments and environment without throwing unhandled exceptions', () => {
-    const result = spawnSync(process.execPath, [devScript, '--invalid-flag-test-only'], {
+    const result = spawnSync(process.execPath, [devScript, '--help'], {
       cwd: rootDir,
       encoding: 'utf8',
       env: { ...process.env, CI: 'true' },
+      timeout: 5000,
     });
 
     // Ensure it did not crash with unhandled exception or stack trace
