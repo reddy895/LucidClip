@@ -31,6 +31,15 @@ pub enum AppError {
 
     #[error("System or OS error: {0}")]
     System(String),
+
+    #[error("Global shortcut error: {0}")]
+    GlobalShortcut(String),
+
+    #[error("Instant paste error: {0}")]
+    InstantPaste(String),
+
+    #[error("Focus restoration error: {0}")]
+    FocusRestoration(String),
 }
 
 impl From<rusqlite::Error> for AppError {
