@@ -3,15 +3,15 @@
 **Project:** LucidClip  
 **Document:** System Architecture  
 **Version:** 1.0  
-**Status:** Proposed  
-**Development Phase:** Phase 1 — Documentation & Product Foundation  
-**Target Platform:** Windows 10 / Windows 11  
+**Status:** Implemented (System-Wide Clipboard Intelligence, Global Hotkeys, Floating Popup, Synthetic Instant Paste, Focus Preservation)  
+**Development Phase:** Production Ready  
+**Target Platform:** Windows 10 / Windows 11 / Linux (X11 & Wayland)  
 **Architecture Style:** Modular Desktop Architecture  
 **Primary Approach:** Local-first
 
 ---
 
-> **Implementation note:** This document remains the proposed long-term architecture. The current Windows build implements native clipboard notifications, text/image/file capture, SQLite persistence, screenshot capture and region cropping, image copy/export, retention, exclusions, launch-at-login, and system-tray background operation. OCR processing and global hotkeys described below are still roadmap items and are not exposed as working controls.
+> **Implementation note:** System-wide clipboard intelligence is fully implemented. The architecture features continuous native clipboard notifications with rapid burst debouncing, internal sequence paste guards, cross-platform global hotkeys (`Ctrl+Shift+V`), a frameless always-on-top floating history popup window, active window focus tracking and restoration, and synthetic instant paste key injection. OCR processing remains a planned roadmap item.
 
 # 1. Introduction
 
@@ -171,7 +171,42 @@ flowchart TB
     REACT -. "Tauri events" .-> TAURI
 ```
 
-## 3.2 Architectural Layers
+## 3.2 Floating Popup & Instant Paste Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant TargetApp as Foreground App
+    participant OS as OS Input / Window Manager
+    participant Hotkey as Global Hotkey Thread
+    participant FocusMgr as Focus Preservation Manager
+    participant Popup as Floating Clipboard Popup
+    participant PasteGuard as Internal Paste Guard
+    participant PasteEngine as Synthetic Paste Engine
+    participant DB as SQLite DB
+
+    Note over User,TargetApp: User is typing in target application
+    User->>OS: Presses Ctrl+Shift+V
+    OS->>Hotkey: Global Hotkey Event Dispatched
+    Hotkey->>FocusMgr: capture_target_window() (PID, HWND/WindowId)
+    Hotkey->>Popup: Show & Center Floating Popup Window
+    Popup->>DB: Fetch Recent History & Render List
+    User->>Popup: ArrowDown / Navigate / Select Entry
+    User->>Popup: Press Enter (execute_instant_paste)
+    Popup->>PasteGuard: tag_suppressed(hash, sequence_id)
+    Popup->>OS: Set System Clipboard Content
+    Popup->>Popup: Hide Popup Window
+    Popup->>FocusMgr: restore_target_focus(target_window)
+    FocusMgr->>OS: SetForegroundWindow / AttachThreadInput
+    OS-->>TargetApp: Foreground Focus Restored
+    Popup->>PasteEngine: inject_synthetic_paste()
+    PasteEngine->>OS: SendInput(VK_CONTROL + 'V') / XTest Fake Key
+    OS->>TargetApp: Synthesized Paste Received & Injected
+    DB->>DB: touch_entry (update last_used_at, usage_count)
+```
+
+## 3.3 Architectural Layers
 
 ### Frontend Layer
 

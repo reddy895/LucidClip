@@ -4,7 +4,7 @@
 
 LucidClip keeps copied text, images, file references, and captured screenshots searchable on the local machine. It does not require an account, does not upload data, and does not include telemetry.
 
-> **Project status:** Windows remains the primary release target. The clipboard pipeline also runs on Linux through GTK, with text/image/file capture, SQLite persistence, diagnostics, pause/resume, and manual capture. Screenshot capture, launch-at-login, and foreground-app exclusions remain Windows-only. OCR and global hotkeys remain planned and are not exposed as working controls.
+> **Project status:** Windows remains the primary release target. System-wide clipboard intelligence is fully implemented with native global hotkeys, floating popup history window, focus restoration, and synthetic instant paste. The clipboard pipeline also runs on Linux through GTK/X11, with text/image/file capture, SQLite persistence, diagnostics, pause/resume, and manual capture. Screenshot capture, launch-at-login, and foreground-app exclusions remain Windows-only. OCR remains planned and is not exposed as a working control.
 >
 > **Platforms:** Windows 10 / Windows 11 (64-bit target); Linux with GTK 3 and an X11 or Wayland session
 >
@@ -43,6 +43,15 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 - Clipboard images are merged into the Screenshots gallery with a `Clipboard` origin badge; they never appear in the text history.
 - Gallery cards load thumbnails on demand, while full-resolution images are requested only for the selected preview.
 
+### System-wide clipboard intelligence & instant paste
+
+- Global hotkey listener (`Ctrl+Shift+V` configurable) across Windows (`RegisterHotKey` message loop) and Linux (X11 `XGrabKey` and Wayland portal diagnostics).
+- Dedicated frameless, always-on-top floating clipboard popup window with full keyboard navigation (`ArrowUp`/`ArrowDown`, `Enter` to paste, `Esc` to close, `Home`/`End`, `Alt+1`..`Alt+9`, `Ctrl+P` to pin, `Delete` to remove).
+- Active window focus preservation and restoration (`GetForegroundWindow`, `AttachThreadInput`, `SetForegroundWindow` on Windows; `_NET_ACTIVE_WINDOW` on X11).
+- Synthetic instant paste key injection (`SendInput` `Ctrl+V` on Windows; XTest / xdotool on Linux with graceful fallback).
+- Internal sequence paste guard and rapid burst debouncing to avoid self-capture loops when pasting history items back into active applications.
+- Full-text search and content-type filtering within the floating popup and main history interface.
+
 ### Settings and storage
 
 - Persists settings as JSON in SQLite.
@@ -59,7 +68,6 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 ### Not implemented
 
 - Screenshot text extraction (OCR).
-- Global hotkeys outside the focused LucidClip window.
 - Configurable screenshot save directory.
 - Linux screenshot capture, launch-at-login, and foreground-app exclusion enforcement.
 - Windows installer signing and release packaging.
