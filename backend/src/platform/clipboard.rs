@@ -311,9 +311,15 @@ mod windows_clipboard {
     pub fn content_is_sensitive() -> Result<bool> {
         let _session = ClipboardSession::open()?;
 
-        let excluded = register_format("ExcludeClipboardContentFromMonitorProcessing");
-        if excluded != 0 && unsafe { IsClipboardFormatAvailable(excluded) } != 0 {
-            return Ok(true);
+        for marker in [
+            "ExcludeClipboardContentFromMonitorProcessing",
+            "Clipboard Viewer Ignore",
+            "PasswordManagerClipboard",
+        ] {
+            let format = register_format(marker);
+            if format != 0 && unsafe { IsClipboardFormatAvailable(format) } != 0 {
+                return Ok(true);
+            }
         }
 
         for name in ["CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"] {

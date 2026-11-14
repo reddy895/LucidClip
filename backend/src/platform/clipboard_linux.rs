@@ -249,10 +249,15 @@ fn percent_decode(input: &[u8]) -> Vec<u8> {
     output
 }
 
-/// Detect the KDE password-manager opt-out target.
+/// Detect the KDE, KeePassXC, Bitwarden, or 1Password password-manager opt-out target.
 pub fn target_name_is_sensitive(name: &str) -> bool {
     let name = name.to_ascii_lowercase();
-    name == "x-kde-passwordmanagerhint" || name == "application/x-kde-passwordmanagerhint"
+    name == "x-kde-passwordmanagerhint"
+        || name == "application/x-kde-passwordmanagerhint"
+        || name == "application/x-keepassxc-selection"
+        || name == "x-keepassxc"
+        || name == "application/x-bitwarden"
+        || name == "x-1password"
 }
 
 pub fn content_is_sensitive() -> Result<bool> {
