@@ -3,6 +3,7 @@
 //! Handles registration, key combination parsing, error detection,
 //! and lifecycle management of system-wide hotkeys (e.g. Ctrl+Shift+V).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use crate::errors::{AppError, Result};
@@ -151,6 +152,26 @@ impl GlobalShortcutState {
             platform_supported,
             error,
         }
+    }
+}
+
+/// Service managing dynamic registration, unregistration, and lifecycle of global shortcuts.
+#[derive(Debug, Clone)]
+pub struct GlobalShortcutService {
+    pub state: Arc<GlobalShortcutState>,
+    pub listener_stop: Arc<AtomicBool>,
+}
+
+impl GlobalShortcutService {
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(GlobalShortcutState::new()),
+            listener_stop: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn stop(&self) {
+        self.listener_stop.store(true, Ordering::SeqCst);
     }
 }
 
