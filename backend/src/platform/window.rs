@@ -77,20 +77,87 @@ pub fn focus_restoration_supported() -> bool {
 #[cfg(target_os = "linux")]
 mod linux_window {
     use super::*;
-
-    pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {
-        // Under Linux X11 or Wayland, foreground tracking is session-dependent.
-        // We initialize a baseline stub here which is extended by the Linux platform module.
-        Ok(None)
-    }
-
-    pub fn restore_target_focus(_target: &ActiveWindowTarget) -> Result<bool> {
-        Ok(false)
-    }
+    use std::process::Command;
+    use std::fs;
+    use crate::platform::environment::{clipboard_environment, ClipboardSession};
 
     pub fn is_supported() -> bool {
-        // Will be wired to session type (X11 supported, Wayland gated)
-        false
+        let env = clipboard_environment();
+        match env.session {
+            ClipboardSession::X11 => true,
+            ClipboardSession::Wayland | ClipboardSession::Unsupported => false,
+        }
+    }
+
+    pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {
+        let env = clipboard_environment();
+        if env.session != ClipboardSession::X11 {
+            return Ok(None);
+        }
+
+        // Try xdotool to get active window
+        let output = match Command::new("xdotool").arg("getactivewindow").output() {
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+            _ => return Ok(None),
+        };
+
+        let window_id: usize = match output.parse() {
+            Ok(id) => id,
+            Err(_) => return Ok(None),
+        };
+
+        // Get window title
+        let title_out = Command::new("xdotool")
+            .args(["getwindowname", &window_id.to_string()])
+            .output()
+            .ok();
+        let window_title = title_out
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        // Get window PID
+        let pid_out = Command::new("xdotool")
+            .args(["getwindowpid", &window_id.to_string()])
+            .output()
+            .ok();
+        let process_id: u32 = pid_out
+            .filter(|o| o.status.success())
+            .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok())
+            .unwrap_or(0);
+
+        let process_name = if process_id > 0 {
+            fs::read_to_string(format!("/proc/{process_id}/comm"))
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        } else {
+            None
+        };
+
+        Ok(Some(ActiveWindowTarget::new(
+            window_id,
+            0,
+            process_id,
+            process_name,
+            window_title,
+        )))
+    }
+
+    pub fn restore_target_focus(target: &ActiveWindowTarget) -> Result<bool> {
+        let env = clipboard_environment();
+        if env.session != ClipboardSession::X11 || target.window_id == 0 {
+            return Ok(false);
+        }
+
+        let res = Command::new("xdotool")
+            .args(["windowactivate", &target.window_id.to_string()])
+            .status();
+
+        match res {
+            Ok(status) => Ok(status.success()),
+            Err(_) => Ok(false),
+        }
     }
 }
 
