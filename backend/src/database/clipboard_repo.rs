@@ -139,6 +139,20 @@ impl<'a> ClipboardRepo<'a> {
         })
     }
 
+    pub fn list_paginated(&self, limit: usize, offset: usize) -> Result<Vec<DbClipboardEntry>> {
+        self.pool.with_conn(|conn| {
+            let mut stmt = conn.prepare(&format!(
+                "SELECT {ENTRY_COLUMNS} FROM clipboard_entries ORDER BY created_at DESC, id DESC LIMIT ?1 OFFSET ?2"
+            ))?;
+
+            let entries = stmt
+                .query_map(params![limit as i64, offset as i64], row_to_entry)?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            Ok(entries)
+        })
+    }
+
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
         self.pool.with_conn(|conn| {
             let current_pin: i64 = conn
