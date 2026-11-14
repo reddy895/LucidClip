@@ -8,6 +8,7 @@ import { PopupFooter } from './PopupFooter';
 import { PopupEmptyState } from './PopupEmptyState';
 import { usePopupKeyboardNavigation } from '@/hooks/usePopupKeyboardNavigation';
 import { usePopupShortcuts } from '@/hooks/usePopupShortcuts';
+import { pasteService } from '@/services';
 
 export interface FloatingClipboardPopupProps {
   onPasteAction?: (entry: ClipboardEntry) => void;
@@ -73,17 +74,19 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   }, [clipboardItems, activeFilter, searchQuery]);
 
   const handlePaste = useCallback(
-    (entry: ClipboardEntry) => {
+    async (entry: ClipboardEntry) => {
       if (onPasteAction) {
         onPasteAction(entry);
-      } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke('execute_instant_paste', {
+      } else {
+        try {
+          await pasteService.executeInstantPaste({
             entryId: entry.id,
             content: entry.content,
             contentType: entry.contentType,
-          }).catch(() => {});
-        });
+          });
+        } catch (err) {
+          console.error('[LucidClip] Paste execution failed:', err);
+        }
       }
     },
     [onPasteAction]
