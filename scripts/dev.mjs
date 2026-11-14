@@ -85,7 +85,10 @@ async function main() {
   // 2. Parse command-line flags
   const rawArgs = process.argv.slice(2);
   const wantsClean = rawArgs.includes('--clean') || rawArgs.includes('--force');
-  const tauriArgs = ['dev', ...rawArgs.filter((arg) => arg !== '--clean' && arg !== '--force')];
+  const isDryRun = rawArgs.includes('--dry-run') || rawArgs.includes('--check');
+  const tauriArgs = ['dev', ...rawArgs.filter((arg) =>
+    arg !== '--clean' && arg !== '--force' && arg !== '--dry-run' && arg !== '--check'
+  )];
 
   // 3. Pre-flight check: Detect port 1420 availability before launching Tauri
   const portStatus = await isPortAvailable(DEV_SERVER_PORT);
@@ -117,6 +120,12 @@ async function main() {
   );
   if (!fs.existsSync(tauriBinary)) {
     fail('The Tauri CLI is not installed. Run `npm install` from the repository root first.');
+  }
+
+  if (isDryRun) {
+    console.log('[LucidClip] Pre-flight verification passed in dry-run mode.');
+    console.log(`[LucidClip] Dev server port ${DEV_SERVER_PORT} is available.`);
+    process.exit(0);
   }
 
   console.log(`[LucidClip] Repository: ${rootDir}`);
