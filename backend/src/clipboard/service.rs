@@ -357,14 +357,12 @@ impl<'a> ClipboardService<'a> {
     }
 
     pub fn clear_unpinned(&self) -> Result<usize> {
-        let before = self.repo.list_all()?;
-        let removed = self.repo.clear_unpinned()?;
+        let unpinned = self.repo.clear_unpinned_transactional()?;
+        let removed = unpinned.len();
         if removed > 0 {
             if let Some(paths) = self.paths {
-                for entry in before {
-                    if !entry.pinned && !entry.favorite {
-                        media::remove(paths, &entry);
-                    }
+                for entry in unpinned {
+                    media::remove(paths, &entry);
                 }
             }
         }

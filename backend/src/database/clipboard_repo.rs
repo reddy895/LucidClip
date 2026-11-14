@@ -271,6 +271,29 @@ impl<'a> ClipboardRepo<'a> {
         })
     }
 
+    pub fn clear_unpinned_transactional(&self) -> Result<Vec<DbClipboardEntry>> {
+        self.pool.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            let unpinned: Vec<DbClipboardEntry> = {
+                let mut stmt = tx.prepare(&format!(
+                    "SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE pinned = 0 AND favorite = 0"
+                ))?;
+                let rows = stmt.query_map([], row_to_entry)?
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                rows
+            };
+
+            if !unpinned.is_empty() {
+                tx.execute(
+                    "DELETE FROM clipboard_entries WHERE pinned = 0 AND favorite = 0",
+                    [],
+                )?;
+            }
+            tx.commit()?;
+            Ok(unpinned)
+        })
+    }
+
     /// Remove unpinned, non-favorite entries older than the cutoff timestamp.
     pub fn purge_older_than(&self, cutoff_millis: i64) -> Result<usize> {
         self.pool.with_conn(|conn| {
