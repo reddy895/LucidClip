@@ -5,6 +5,7 @@ import { PopupHeader } from './PopupHeader';
 import { PopupFilterChips, PopupFilterType } from './PopupFilterChips';
 import { PopupHistoryList } from './PopupHistoryList';
 import { PopupFooter } from './PopupFooter';
+import { PopupEmptyState } from './PopupEmptyState';
 import { usePopupKeyboardNavigation } from '@/hooks/usePopupKeyboardNavigation';
 import { usePopupShortcuts } from '@/hooks/usePopupShortcuts';
 
@@ -15,7 +16,7 @@ export interface FloatingClipboardPopupProps {
 export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   onPasteAction,
 }) => {
-  const { clipboardItems, monitorStatus, togglePin, deleteItem, clearClipboardHistory } = useApp();
+  const { clipboardItems, monitorStatus, togglePin, deleteItem, clearClipboardHistory, isLoading } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PopupFilterType>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -147,14 +148,22 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
         counts={counts}
       />
 
-      <PopupHistoryList
-        items={filteredItems}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
-        onPaste={handlePaste}
-        onTogglePin={(item) => togglePin({ kind: 'clipboard', ...item })}
-        onDelete={(item) => deleteItem({ kind: 'clipboard', ...item })}
-      />
+      {isLoading || filteredItems.length === 0 ? (
+        <PopupEmptyState
+          isLoading={isLoading}
+          searchQuery={searchQuery}
+          onClearSearch={() => setSearchQuery('')}
+        />
+      ) : (
+        <PopupHistoryList
+          items={filteredItems}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+          onPaste={handlePaste}
+          onTogglePin={(item) => togglePin({ kind: 'clipboard', ...item })}
+          onDelete={(item) => deleteItem({ kind: 'clipboard', ...item })}
+        />
+      )}
 
       <PopupFooter
         unpinnedCount={counts.all - counts.pinned}
