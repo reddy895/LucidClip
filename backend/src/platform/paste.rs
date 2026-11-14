@@ -42,6 +42,17 @@ impl PasteExecutionResult {
             message: Some(message.into()),
         }
     }
+
+    pub fn clipboard_fallback_with_reason(target_restored: bool, reason: &str) -> Self {
+        let msg = format!("Content copied to clipboard. Paste directly with Ctrl+V ({reason}).");
+        Self {
+            success: true,
+            target_restored,
+            method: PasteMethod::ClipboardOnly,
+            fallback_used: true,
+            message: Some(msg),
+        }
+    }
 }
 
 /// Whether the host platform environment supports native synthetic paste injection.

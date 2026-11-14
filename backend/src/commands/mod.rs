@@ -582,9 +582,18 @@ pub fn execute_instant_paste(
 
     state.focus_manager.clear();
     // Fallback: clipboard was set, inform user or frontend
-    Ok(crate::platform::PasteExecutionResult::clipboard_fallback(
+    let env = crate::platform::clipboard_environment();
+    let reason = if env.session == crate::platform::ClipboardSession::Wayland {
+        "Wayland environment restricts synthetic keystroke injection"
+    } else if !crate::platform::synthetic_paste_supported() {
+        "Synthetic input utility not detected"
+    } else {
+        "Automatic paste injection bypassed"
+    };
+
+    Ok(crate::platform::PasteExecutionResult::clipboard_fallback_with_reason(
         target_restored,
-        "Content copied to clipboard. Press Ctrl+V in target application.",
+        reason,
     ))
 }
 
