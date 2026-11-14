@@ -30,7 +30,10 @@ pub use screenshot::{
     CapturedImage, ScreenBounds,
 };
 pub use startup::{launch_on_startup_enabled, set_launch_on_startup};
-pub use window::foreground_process_name;
+pub use window::{
+    capture_foreground_target, focus_restoration_supported, foreground_process_name,
+    restore_target_focus,
+};
 
 /// Prepare the clipboard backend on the current (main) thread.
 ///

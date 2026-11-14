@@ -1,6 +1,7 @@
-//! Foreground window inspection used for source-app attribution and exclusions.
+//! Foreground window inspection used for source-app attribution, focus tracking, and exclusions.
 
 use crate::errors::Result;
+use crate::platform::focus::ActiveWindowTarget;
 
 /// Return the executable file name of the process owning the foreground window.
 ///
@@ -18,21 +19,98 @@ pub fn foreground_process_name() -> Result<Option<String>> {
     }
 }
 
+/// Capture full foreground window details (HWND, thread, PID, process name, title).
+pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_window::capture_foreground_target()
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        linux_window::capture_foreground_target()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        Ok(None)
+    }
+}
+
+/// Restore keyboard focus to the specified target window.
+pub fn restore_target_focus(target: &ActiveWindowTarget) -> Result<bool> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_window::restore_target_focus(target)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        linux_window::restore_target_focus(target)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        let _ = target;
+        Ok(false)
+    }
+}
+
+/// Whether the current platform environment can restore window focus to external processes.
+pub fn focus_restoration_supported() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        true
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        linux_window::is_supported()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        false
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod linux_window {
+    use super::*;
+
+    pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {
+        // Under Linux X11 or Wayland, foreground tracking is session-dependent.
+        // We initialize a baseline stub here which is extended by the Linux platform module.
+        Ok(None)
+    }
+
+    pub fn restore_target_focus(_target: &ActiveWindowTarget) -> Result<bool> {
+        Ok(false)
+    }
+
+    pub fn is_supported() -> bool {
+        // Will be wired to session type (X11 supported, Wayland gated)
+        false
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod windows_window {
     use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
     use std::path::Path;
 
-    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::Foundation::{CloseHandle, HWND};
     use windows_sys::Win32::System::Threading::{
-        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+        GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowThreadProcessId,
+        AttachThreadInput, BringWindowToTop, GetForegroundWindow, GetWindowTextW,
+        GetWindowThreadProcessId, SetFocus, SetForegroundWindow,
     };
 
     use crate::errors::{AppError, Result};
+    use crate::platform::focus::ActiveWindowTarget;
 
     const MAX_PATH_UNITS: usize = 1_024;
 
@@ -71,5 +149,65 @@ mod windows_window {
         Ok(path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned()))
+    }
+
+    pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {
+        let window = unsafe { GetForegroundWindow() };
+        if window.is_null() {
+            return Ok(None);
+        }
+
+        let mut process_id = 0u32;
+        let thread_id = unsafe { GetWindowThreadProcessId(window, &mut process_id) };
+        if thread_id == 0 {
+            return Ok(None);
+        }
+
+        let process_name = match foreground_process_name() {
+            Ok(name) => name,
+            Err(_) => None,
+        };
+
+        let mut title_buf = [0u16; 512];
+        let title_len = unsafe { GetWindowTextW(window, title_buf.as_mut_ptr(), 512) };
+        let window_title = if title_len > 0 {
+            Some(OsString::from_wide(&title_buf[..title_len as usize]).to_string_lossy().into_owned())
+        } else {
+            None
+        };
+
+        Ok(Some(ActiveWindowTarget::new(
+            window as usize,
+            thread_id,
+            process_id,
+            process_name,
+            window_title,
+        )))
+    }
+
+    pub fn restore_target_focus(target: &ActiveWindowTarget) -> Result<bool> {
+        let hwnd = target.window_id as HWND;
+        if hwnd.is_null() {
+            return Ok(false);
+        }
+
+        let current_thread = unsafe { GetCurrentThreadId() };
+        let attached = if current_thread != target.thread_id && target.thread_id != 0 {
+            unsafe { AttachThreadInput(current_thread, target.thread_id, 1) != 0 }
+        } else {
+            false
+        };
+
+        let brought_to_top = unsafe { BringWindowToTop(hwnd) != 0 };
+        let foreground_set = unsafe { SetForegroundWindow(hwnd) != 0 };
+        let _ = unsafe { SetFocus(hwnd) };
+
+        if attached {
+            unsafe {
+                AttachThreadInput(current_thread, target.thread_id, 0);
+            }
+        }
+
+        Ok(brought_to_top || foreground_set)
     }
 }
