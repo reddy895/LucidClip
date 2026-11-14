@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ClipboardEntry, HistoryItem } from '@/types';
 import { formatBytes, formatFullDateTime, formatRelativeTime } from '@/utils';
-import { Badge, Button, Tooltip } from '@/components/ui';
+import { Badge, Button, Tooltip, Dialog } from '@/components/ui';
 import { CodeSnippetPreview } from '@/components/clipboard/CodeSnippetPreview';
 import { UrlPreview } from '@/components/clipboard/UrlPreview';
 import {
@@ -15,6 +15,7 @@ import {
   Hash,
   ImageOff,
   Loader2,
+  Maximize2,
 } from 'lucide-react';
 import { useApp } from '@/context';
 import { clipboardService } from '@/services';
@@ -26,6 +27,7 @@ export interface TextPreviewProps {
 export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
   const asHistoryItem: HistoryItem = { kind: 'clipboard', ...entry };
+  const [isInspectionOpen, setIsInspectionOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | undefined>(entry.imageUrl);
   const [imageState, setImageState] = useState<'idle' | 'loading' | 'ready' | 'error'>(
     entry.contentType === 'image' ? (entry.imageUrl ? 'ready' : 'loading') : 'idle'
@@ -89,6 +91,16 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
             >
               Copy
             </Button>
+          </Tooltip>
+
+          <Tooltip content="Inspect Details">
+            <button
+              type="button"
+              onClick={() => setIsInspectionOpen(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-btn text-graphite-text-secondary hover:text-graphite-text-primary hover:bg-graphite-hover transition-colors"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
           </Tooltip>
 
           <Tooltip content={entry.isPinned ? 'Unpin' : 'Pin'}>
@@ -254,6 +266,47 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
           </div>
         </div>
       </div>
+
+      <Dialog
+        isOpen={isInspectionOpen}
+        onClose={() => setIsInspectionOpen(false)}
+        maxWidth="xl"
+        title={`Rich Text Detail Inspector — ${entry.contentType.toUpperCase()}`}
+      >
+        <div className="flex flex-col gap-3 max-h-[70vh]">
+          <div className="flex items-center justify-between text-xs text-graphite-text-muted font-mono pb-2 border-b border-graphite-border">
+            <span>
+              {entry.charCount} chars &bull; {entry.wordCount} words &bull; {entry.lineCount} lines
+            </span>
+            <span>{entry.byteSize ? formatBytes(entry.byteSize) : ''} &bull; UTF-8</span>
+          </div>
+
+          <div className="overflow-auto max-h-[50vh] p-3 rounded bg-[#111315] border border-graphite-border font-mono text-xs text-[#F3F4F6] whitespace-pre-wrap select-text break-words">
+            {entry.content}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-graphite-border">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Copy className="h-3.5 w-3.5" />}
+              onClick={() => {
+                copyItem(asHistoryItem);
+                setIsInspectionOpen(false);
+              }}
+            >
+              Copy to Clipboard
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsInspectionOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 };
