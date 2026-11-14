@@ -649,6 +649,18 @@ mod tests {
             .unwrap();
         assert!(monitoring_enabled(&pool));
     }
+
+    #[test]
+    fn paste_guard_suppression_prevents_duplicate_captures() {
+        let guard = PasteGuard::new();
+        let hash = hash_content("LucidClip internal content");
+        assert!(!guard.is_internal(&hash));
+
+        let seq = guard.mark_internal(&hash);
+        assert!(seq >= 1);
+        assert!(guard.is_internal(&hash));
+        assert_eq!(guard.last_intercepted_sequence(), seq);
+    }
 }
 
 #[cfg(test)]
