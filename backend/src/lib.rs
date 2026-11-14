@@ -12,13 +12,15 @@ pub mod storage;
 
 use crate::clipboard::{MonitorStatus, PasteGuard};
 use crate::database::{run_migrations, DbPool};
-use crate::platform::FocusManager;
+use crate::platform::{FocusManager, GlobalShortcutService};
 use crate::storage::AppPaths;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, WindowEvent};
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "lucidclip-tray";
@@ -32,6 +34,7 @@ pub struct AppState {
     pub monitor_status: Arc<Mutex<MonitorStatus>>,
     pub paste_guard: Arc<PasteGuard>,
     pub focus_manager: Arc<FocusManager>,
+    pub hotkeys: Arc<GlobalShortcutService>,
 }
 
 impl AppState {
@@ -42,6 +45,7 @@ impl AppState {
         monitor_status: Arc<Mutex<MonitorStatus>>,
         paste_guard: Arc<PasteGuard>,
         focus_manager: Arc<FocusManager>,
+        hotkeys: Arc<GlobalShortcutService>,
     ) -> Self {
         Self {
             pool,
@@ -50,6 +54,7 @@ impl AppState {
             monitor_status,
             paste_guard,
             focus_manager,
+            hotkeys,
         }
     }
 }
@@ -189,6 +194,7 @@ pub fn run() {
             let monitor_status = Arc::new(Mutex::new(clipboard::initial_status()));
             let paste_guard = Arc::new(PasteGuard::new());
             let focus_manager = Arc::new(FocusManager::new());
+            let hotkeys = Arc::new(GlobalShortcutService::new());
             let monitor_paths = paths.clone();
             let state = AppState::new(
                 pool.clone(),
@@ -197,8 +203,9 @@ pub fn run() {
                 monitor_status.clone(),
                 paste_guard.clone(),
                 focus_manager.clone(),
+                hotkeys.clone(),
             );
-            app.manage(state);
+            app.manage(state.clone());
 
             clipboard::spawn_monitor(
                 app.handle().clone(),
@@ -208,6 +215,31 @@ pub fn run() {
                 monitor_status,
                 paste_guard,
             );
+
+            #[cfg(target_os = "windows")]
+            {
+                if let Ok(key) = crate::platform::ShortcutKey::parse(crate::platform::DEFAULT_HISTORY_SHORTCUT) {
+                    let app_handle = app.handle().clone();
+                    let state_for_hotkey = state.clone();
+                    let hotkeys_clone = hotkeys.clone();
+                    let _ = crate::platform::spawn_windows_hotkey_listener(
+                        key,
+                        hotkeys_clone.listener_stop.clone(),
+                        move || {
+                            let target = crate::platform::capture_foreground_target().unwrap_or(None);
+                            state_for_hotkey.focus_manager.set_target(target);
+                            let _ = crate::platform::show_popup_window(&app_handle);
+                            let _ = app_handle.emit(
+                                "clipboard://global-shortcut-triggered",
+                                serde_json::json!({
+                                    "shortcut": crate::platform::DEFAULT_HISTORY_SHORTCUT,
+                                }),
+                            );
+                        },
+                    );
+                    hotkeys.state.set_active(crate::platform::DEFAULT_HISTORY_SHORTCUT, true, None);
+                }
+            }
 
             match setup_tray_icon(app.handle()) {
                 Ok(()) => hide_on_close(app.handle()),
@@ -261,6 +293,7 @@ pub fn run() {
                 state
                     .monitor_stop
                     .store(true, std::sync::atomic::Ordering::Relaxed);
+                state.hotkeys.stop();
             }
             platform::shutdown_clipboard_backend();
         }
