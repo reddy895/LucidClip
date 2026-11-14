@@ -9,7 +9,7 @@ pub mod monitor;
 pub mod normalize;
 pub mod service;
 
-pub use classifier::{classify_content, ClipboardContentType};
+pub use classifier::{classify_content, detect_programming_language, ClipboardContentType};
 pub use events::{
     ClipboardCapturedEvent, CLIPBOARD_CAPTURED_EVENT, CLIPBOARD_EVENT_VERSION,
     CLIPBOARD_STATUS_EVENT,

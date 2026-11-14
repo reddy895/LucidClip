@@ -119,21 +119,68 @@ fn is_code_snippet(text: &str) -> bool {
         "struct ",
         "enum ",
         "interface ",
+        "type ",
+        "async ",
+        "await ",
+        "match ",
         "SELECT ",
         "INSERT INTO ",
         "UPDATE ",
         "DELETE FROM ",
         "WHERE ",
+        "CREATE TABLE ",
         "public class ",
         "private ",
         "protected ",
         "namespace ",
+        "<!DOCTYPE ",
+        "<html",
+        "<div",
+        "console.log",
+        "println!",
     ];
 
     let has_keyword = code_keywords.iter().any(|&kw| text.contains(kw));
     let has_code_syntax = (text.contains('{') && text.contains('}'))
         || (text.contains("=>") || text.contains("->"))
+        || (text.contains("::") && text.contains('('))
         || (text.contains(';') && text.contains('\n'));
 
     has_keyword || (has_code_syntax && text.contains('\n'))
+}
+
+/// Detect the likely programming language of a code or structured text snippet.
+pub fn detect_programming_language(text: &str) -> Option<&'static str> {
+    let t = text.trim();
+    if (t.starts_with('{') && t.ends_with('}')) || (t.starts_with('[') && t.ends_with(']')) {
+        if serde_json::from_str::<serde_json::Value>(t).is_ok() {
+            return Some("json");
+        }
+    }
+
+    if t.contains("fn ") || t.contains("impl ") || t.contains("pub struct ") || t.contains("println!") {
+        return Some("rust");
+    }
+
+    if t.contains("def ") || t.contains("import numpy") || t.contains("import os") || t.contains("print(") {
+        return Some("python");
+    }
+
+    if t.contains("interface ") || t.contains(": string") || t.contains(": number") || t.contains("export default") {
+        return Some("typescript");
+    }
+
+    if t.contains("const ") || t.contains("let ") || t.contains("console.log") || t.contains("function(") {
+        return Some("javascript");
+    }
+
+    if t.contains("SELECT ") || t.contains("FROM ") || t.contains("INSERT INTO ") {
+        return Some("sql");
+    }
+
+    if t.starts_with("<!DOCTYPE") || t.starts_with("<html") || (t.contains("<div") && t.contains("</div>")) {
+        return Some("html");
+    }
+
+    None
 }
