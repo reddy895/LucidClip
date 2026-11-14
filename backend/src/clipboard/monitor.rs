@@ -36,6 +36,7 @@ const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
 /// Even with native notifications, run a slow safety pass to recover from
 /// dropped or missed messages without polling aggressively.
 const SAFETY_POLL_INTERVAL: Duration = Duration::from_secs(2);
+const IDLE_PAUSED_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Guard against pathological clipboard payloads freezing the UI or database.
 const MAX_CAPTURE_CHARS: usize = 1_000_000;
@@ -439,12 +440,25 @@ impl ClipboardMonitorWorker {
         }
         emit_status(&self.app, &self.status);
 
+        let mut was_paused = false;
+
         while !self.stop.load(Ordering::Relaxed) {
+            let poll_duration = if was_paused {
+                IDLE_PAUSED_POLL_INTERVAL
+            } else {
+                SAFETY_POLL_INTERVAL
+            };
+
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             let wait_result = match &self.native_notifications {
-                Some(receiver) => receiver.recv_timeout(SAFETY_POLL_INTERVAL),
+                Some(receiver) => receiver.recv_timeout(poll_duration),
                 None => {
-                    thread::sleep(POLL_INTERVAL);
+                    let fallback_sleep = if was_paused {
+                        IDLE_PAUSED_POLL_INTERVAL
+                    } else {
+                        POLL_INTERVAL
+                    };
+                    thread::sleep(fallback_sleep);
                     Err(RecvTimeoutError::Timeout)
                 }
             };
@@ -480,7 +494,7 @@ impl ClipboardMonitorWorker {
             }
 
             let policy = monitor_policy(&self.pool);
-            let was_paused = !policy.enabled;
+            was_paused = !policy.enabled;
             update_status(&self.status, |state| state.paused = was_paused);
             if policy.enabled {
                 capture_clipboard_once(
