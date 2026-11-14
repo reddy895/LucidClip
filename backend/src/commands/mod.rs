@@ -495,6 +495,20 @@ pub fn hide_clipboard_popup(app: tauri::AppHandle) -> Result<()> {
 }
 
 #[tauri::command]
+pub fn hide_popup_and_restore_focus(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<bool> {
+    let _ = crate::platform::hide_popup_window(&app);
+    let target = state.focus_manager.get_target();
+    if let Some(ref t) = target {
+        crate::platform::restore_target_focus(t)
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
 pub fn get_paste_capabilities() -> Result<PasteCapabilitiesDto> {
     let env = crate::platform::clipboard_environment();
     Ok(PasteCapabilitiesDto {

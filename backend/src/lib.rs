@@ -282,6 +282,7 @@ pub fn run() {
             commands::capture_active_target_window,
             commands::show_clipboard_popup,
             commands::hide_clipboard_popup,
+            commands::hide_popup_and_restore_focus,
             commands::get_paste_capabilities,
             commands::execute_instant_paste,
             commands::get_global_shortcut_status,
