@@ -31,6 +31,8 @@ export interface ClipboardEntry {
   isFavorite: boolean;
   createdAt: string; // ISO 8601
   updatedAt: string;
+  lastUsedAt?: string;
+  usageCount?: number;
 }
 
 
