@@ -14,7 +14,7 @@ export interface FloatingClipboardPopupProps {
 export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   onPasteAction,
 }) => {
-  const { clipboardItems, monitorStatus, togglePin } = useApp();
+  const { clipboardItems, monitorStatus, togglePin, deleteItem } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PopupFilterType>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -107,12 +107,20 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
     }
   }, [filteredItems, selectedIndex, togglePin]);
 
+  const handleDeleteSelected = useCallback(() => {
+    const selected = filteredItems[selectedIndex];
+    if (selected) {
+      deleteItem({ kind: 'clipboard', ...selected });
+    }
+  }, [filteredItems, selectedIndex, deleteItem]);
+
   usePopupShortcuts({
     searchInputRef,
     searchQuery,
     onClearSearch: () => setSearchQuery(''),
     onClosePopup: handleClose,
     onTogglePinSelected: handleTogglePinSelected,
+    onDeleteSelected: handleDeleteSelected,
   });
 
   const isMonitoring = monitorStatus ? monitorStatus.running && !monitorStatus.paused : true;
@@ -144,6 +152,7 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
         onSelect={setSelectedIndex}
         onPaste={handlePaste}
         onTogglePin={(item) => togglePin({ kind: 'clipboard', ...item })}
+        onDelete={(item) => deleteItem({ kind: 'clipboard', ...item })}
       />
     </div>
   );
