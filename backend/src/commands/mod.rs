@@ -520,6 +520,15 @@ pub fn set_clipboard_with_internal_guard(
 }
 
 #[tauri::command]
+pub fn trigger_synthetic_paste() -> Result<bool> {
+    if crate::platform::synthetic_paste_supported() {
+        crate::platform::trigger_paste_keystroke()
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
 pub fn get_paste_capabilities() -> Result<PasteCapabilitiesDto> {
     let env = crate::platform::clipboard_environment();
     Ok(PasteCapabilitiesDto {

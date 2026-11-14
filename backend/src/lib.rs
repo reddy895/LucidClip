@@ -284,6 +284,7 @@ pub fn run() {
             commands::hide_clipboard_popup,
             commands::hide_popup_and_restore_focus,
             commands::set_clipboard_with_internal_guard,
+            commands::trigger_synthetic_paste,
             commands::get_paste_capabilities,
             commands::execute_instant_paste,
             commands::get_global_shortcut_status,
