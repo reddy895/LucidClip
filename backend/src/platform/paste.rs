@@ -97,10 +97,27 @@ pub(crate) mod linux_paste {
 #[cfg(target_os = "windows")]
 pub(crate) mod windows_paste {
     use super::*;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{keybd_event, KEYEVENTF_KEYUP};
+
+    const VK_CONTROL: u8 = 0x11;
+    const VK_V: u8 = 0x56;
 
     pub fn trigger_ctrl_v() -> Result<bool> {
-        // Will be wired to SendInput / keybd_event in Commit 11
-        Ok(false)
+        // Sleep briefly to ensure window manager has switched focus to target window
+        std::thread::sleep(std::time::Duration::from_millis(25));
+
+        unsafe {
+            // Control DOWN
+            keybd_event(VK_CONTROL, 0, 0, 0);
+            // V DOWN
+            keybd_event(VK_V, 0, 0, 0);
+            // V UP
+            keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0);
+            // Control UP
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+        }
+
+        Ok(true)
     }
 }
 
