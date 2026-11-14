@@ -460,14 +460,22 @@ impl ClipboardMonitorWorker {
 
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             if matches!(wait_result, Ok(())) {
-                // Let the source application finish publishing every format, then
-                // drain any queued notifications into this single capture.
+                // Coalesce rapid bursts: native notifications can arrive in bursts as
+                // an application publishes multiple clipboard representations. Wait
+                // DEBOUNCE_INTERVAL and drain all pending events into a single pass.
                 thread::sleep(DEBOUNCE_INTERVAL);
+                let mut burst_count = 0usize;
                 while self
                     .native_notifications
                     .as_ref()
                     .is_some_and(|receiver| receiver.try_recv().is_ok())
-                {}
+                {
+                    burst_count = burst_count.saturating_add(1);
+                }
+                if burst_count > 0 {
+                    // Small additional settle window if many notifications were queued
+                    thread::sleep(Duration::from_millis(15));
+                }
             }
 
             let policy = monitor_policy(&self.pool);
