@@ -8,6 +8,7 @@ pub mod clipboard_watcher;
 pub mod environment;
 pub mod focus;
 pub mod hotkeys;
+pub mod hotkeys_windows;
 pub mod paste;
 pub mod popup_window;
 pub mod screenshot;
