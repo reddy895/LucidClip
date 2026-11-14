@@ -117,8 +117,8 @@ This ledger documents the complete 93-commit implementation of **System-Wide Cli
 89. `5cec604` — `docs(shortcuts): document system-wide keyboard shortcuts and desktop navigation`
 90. `6578ed5` — `docs(architecture): update system architecture diagrams with popup and paste engine`
 91. `ac1f8f2` — `docs(platform): update Linux X11 and Wayland capability documentation`
-92. `[Pending]` — `docs(ledger): record commit ledger tracking all 93 commits and verification evidence`
-93. `[Pending]` — `chore(release): finalize production configuration and validation suite for release`
+92. `32980ab` — `docs(ledger): record commit ledger tracking all 93 commits and verification evidence`
+93. `[Commit 93]` — `chore(release): finalize production configuration and validation suite for release`
 
 ---
 
@@ -126,7 +126,7 @@ This ledger documents the complete 93-commit implementation of **System-Wide Cli
 
 | Check | Tool / Command | Result | Details |
 | :--- | :--- | :--- | :--- |
-| **Automated Verification Suite** | `npm test` | **PASS (39/39 tests)** | 10 test suites covering port conflict, lifecycle, popup keyboard navigation, popup filtering, core integrity, and Rust integration tests. |
+| **Automated Verification Suite** | `npm test` | **PASS (40/40 tests)** | 10 test suites covering port conflict, lifecycle, popup keyboard navigation, popup filtering, release documentation, core integrity, and Rust integration tests. |
 | **Frontend TypeScript Typecheck** | `npm run typecheck` | **PASS (0 errors)** | `tsc --noEmit` validates all frontend components, hooks, services, and types. |
 | **Project Layout Validation** | `npm run check:layout` | **PASS** | Validates directory structures, frontend/backend paths, and development configuration. |
 | **Production Frontend Build** | `npm run build` | **PASS** | Vite compiles clean production distribution in `frontend/dist`. |

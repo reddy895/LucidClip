@@ -50,6 +50,21 @@ describe('LucidClip Core Integrity Verification', () => {
     assert.deepEqual(errors, [], `Layout validation failed:\n${errors.join('\n')}`);
   });
 
+  test('Release Readiness: System-wide clipboard intelligence specifications are documented', () => {
+    for (const docFile of [
+      'docs/SYSTEM_WIDE_CLIPBOARD.md',
+      'docs/SHORTCUTS.md',
+      'docs/LINUX.md',
+      'docs/COMMIT_LEDGER.md',
+      'docs/IPC_CONTRACTS.md',
+    ]) {
+      const docPath = path.join(rootDir, docFile);
+      assert.ok(fs.existsSync(docPath), `${docFile} must exist`);
+      const stat = fs.statSync(docPath);
+      assert.ok(stat.size > 500, `${docFile} must not be empty`);
+    }
+  });
+
   test('Zero-Mock Policy: fresh services initialize with zero entries', () => {
     // Read the mock services to verify no fixtures are loaded into default state
     const clipServiceSrc = fs.readFileSync(
