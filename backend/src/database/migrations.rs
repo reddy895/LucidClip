@@ -96,6 +96,12 @@ pub const MIGRATIONS: &[Migration] = &[
               CREATE INDEX IF NOT EXISTS idx_clipboard_source_app ON clipboard_entries(source_app);
               CREATE INDEX IF NOT EXISTS idx_clipboard_usage_count ON clipboard_entries(usage_count DESC);",
     },
+    Migration {
+        version: 9,
+        description: "optimize search and ranking queries with compound index",
+        sql: "CREATE INDEX IF NOT EXISTS idx_clipboard_ranking
+              ON clipboard_entries(pinned DESC, favorite DESC, created_at DESC, id DESC);",
+    },
 ];
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {

@@ -345,4 +345,17 @@ impl<'a> ClipboardRepo<'a> {
             Ok(count)
         })
     }
+
+    pub fn explain_query_plan(&self, sql: &str) -> Result<Vec<String>> {
+        self.pool.with_conn(|conn| {
+            let mut stmt = conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}"))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    let detail: String = row.get(3)?;
+                    Ok(detail)
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            Ok(rows)
+        })
+    }
 }
