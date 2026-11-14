@@ -4,6 +4,7 @@ import { ClipboardEntry } from '@/types';
 import { PopupHeader } from './PopupHeader';
 import { PopupFilterChips, PopupFilterType } from './PopupFilterChips';
 import { PopupHistoryList } from './PopupHistoryList';
+import { PopupFooter } from './PopupFooter';
 import { usePopupKeyboardNavigation } from '@/hooks/usePopupKeyboardNavigation';
 import { usePopupShortcuts } from '@/hooks/usePopupShortcuts';
 
@@ -14,7 +15,7 @@ export interface FloatingClipboardPopupProps {
 export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   onPasteAction,
 }) => {
-  const { clipboardItems, monitorStatus, togglePin, deleteItem } = useApp();
+  const { clipboardItems, monitorStatus, togglePin, deleteItem, clearClipboardHistory } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PopupFilterType>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +154,11 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
         onPaste={handlePaste}
         onTogglePin={(item) => togglePin({ kind: 'clipboard', ...item })}
         onDelete={(item) => deleteItem({ kind: 'clipboard', ...item })}
+      />
+
+      <PopupFooter
+        unpinnedCount={counts.all - counts.pinned}
+        onClearUnpinned={clearClipboardHistory}
       />
     </div>
   );
