@@ -4,6 +4,7 @@ import { MainLayout, AppFooter } from '@/components/layout';
 import { PreviewPanel } from '@/components/preview';
 import { QuickAccessOverlay } from '@/components/quick-access';
 import { RegionCaptureDialog } from '@/components/screenshots/RegionCaptureDialog';
+import { FloatingClipboardPopup } from '@/components/popup/FloatingClipboardPopup';
 import { useDesktopShortcuts } from '@/hooks';
 import {
   AllItemsView,
@@ -76,10 +77,14 @@ const AppContent: React.FC = () => {
 };
 
 export default function App() {
+  const isPopup =
+    typeof window !== 'undefined' &&
+    (window.location.hash === '#popup' || window.location.search.includes('popup=true'));
+
   return (
     <ToastProvider>
       <AppProvider>
-        <AppContent />
+        {isPopup ? <FloatingClipboardPopup /> : <AppContent />}
       </AppProvider>
     </ToastProvider>
   );
