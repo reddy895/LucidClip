@@ -8,6 +8,8 @@ pub mod clipboard_watcher;
 pub mod environment;
 pub mod focus;
 pub mod hotkeys;
+#[cfg(target_os = "linux")]
+pub mod hotkeys_linux;
 pub mod hotkeys_windows;
 pub mod paste;
 pub mod popup_window;
