@@ -19,7 +19,8 @@ pub mod window;
 
 pub use focus::{ActiveWindowTarget, FocusManager};
 pub use hotkeys::{
-    GlobalShortcutState, GlobalShortcutStatus, ShortcutKey, DEFAULT_HISTORY_SHORTCUT,
+    probe_shortcut_availability, GlobalShortcutState, GlobalShortcutStatus, ShortcutKey,
+    DEFAULT_HISTORY_SHORTCUT,
 };
 pub use hotkeys_windows::spawn_windows_hotkey_listener;
 pub use paste::{

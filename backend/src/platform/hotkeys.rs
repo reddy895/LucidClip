@@ -55,6 +55,18 @@ impl ShortcutKey {
             return Err(AppError::InvalidInput("Shortcut must specify a primary key".into()));
         }
 
+        let is_valid_key = (key.len() == 1 && key.chars().next().unwrap().is_ascii_alphanumeric())
+            || matches!(
+                key.as_str(),
+                "SPACE" | "TAB" | "ENTER" | "ESCAPE" | "INSERT" | "DELETE" | "HOME" | "END"
+                    | "PAGEUP" | "PAGEDOWN" | "UP" | "DOWN" | "LEFT" | "RIGHT"
+                    | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
+            );
+
+        if !is_valid_key {
+            return Err(AppError::InvalidInput(format!("Unsupported primary key: '{key}'")));
+        }
+
         Ok(Self {
             ctrl,
             shift,
@@ -142,6 +154,20 @@ impl GlobalShortcutState {
     }
 }
 
+/// Validate and probe whether a shortcut string is syntactically valid and non-conflicting.
+pub fn probe_shortcut_availability(raw: &str) -> Result<ShortcutKey> {
+    let key = ShortcutKey::parse(raw)?;
+
+    #[cfg(target_os = "windows")]
+    {
+        const PROBE_ID: i32 = 0x4C44;
+        crate::platform::hotkeys_windows::register_hotkey(PROBE_ID, &key)?;
+        let _ = crate::platform::hotkeys_windows::unregister_hotkey(PROBE_ID);
+    }
+
+    Ok(key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +207,14 @@ mod tests {
         let updated = state.status(true);
         assert!(updated.active);
         assert!(updated.error.is_none());
+    }
+
+    #[test]
+    fn test_shortcut_probe() {
+        let valid = probe_shortcut_availability("Ctrl+Shift+V");
+        assert!(valid.is_ok());
+
+        let invalid = probe_shortcut_availability("InvalidKeyString");
+        assert!(invalid.is_err());
     }
 }
