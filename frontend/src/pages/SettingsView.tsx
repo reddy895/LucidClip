@@ -471,10 +471,48 @@ export const SettingsView: React.FC = () => {
           )}
 
           {activeTab === 'shortcuts' && (
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-4">
               <SettingsSection
-                title="Keyboard Shortcuts"
-                description="Shortcuts are active while the LucidClip window is focused."
+                title="System-Wide Global Shortcuts"
+                description="Global shortcuts trigger anywhere across your OS, even when LucidClip is hidden in the tray."
+              >
+                <div className="flex items-center justify-between py-1">
+                  <div>
+                    <div className="text-xs font-medium text-graphite-text-primary">
+                      Floating Clipboard Popup
+                    </div>
+                    <div className="text-[11px] text-graphite-text-muted">
+                      Toggle the frameless instant clipboard history window.
+                    </div>
+                  </div>
+                  <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-[#8B9CF7] border border-[#8B9CF7]/40 shadow-sm font-semibold">
+                    {settings.shortcuts.historyPopup || 'Ctrl+Shift+V'}
+                  </kbd>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-t border-graphite-border/40 pt-2">
+                  <div>
+                    <div className="text-xs font-medium text-graphite-text-primary">
+                      Instant Paste Key Injection
+                    </div>
+                    <div className="text-[11px] text-graphite-text-muted">
+                      Automatically inject Ctrl+V into the target application when pressing Enter in the popup.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={settings.clipboard.instantPasteEnabled}
+                    onChange={(checked) =>
+                      updateSettings({
+                        clipboard: { ...settings.clipboard, instantPasteEnabled: checked },
+                      })
+                    }
+                  />
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Application Window Shortcuts"
+                description="Shortcuts active while the LucidClip main window is focused."
               >
                 {[
                   { label: 'Quick Access Launcher', description: 'Open or close the search overlay.', keys: settings.shortcuts.quickAccess },

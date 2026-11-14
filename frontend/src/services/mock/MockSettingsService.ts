@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     ignoreDuplicates: true,
     captureImages: true,
     excludedApps: ['1Password.exe', 'KeePass.exe', 'Bitwarden.exe', 'KeePassXC.exe'],
+    instantPasteEnabled: true,
   },
   screenshots: {
     saveDirectory: '',

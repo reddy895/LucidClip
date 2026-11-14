@@ -13,6 +13,7 @@ export interface ClipboardSettings {
   ignoreDuplicates: boolean;
   captureImages: boolean;
   excludedApps: string[];
+  instantPasteEnabled: boolean;
 }
 
 export interface ScreenshotSettings {
