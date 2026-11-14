@@ -84,10 +84,30 @@ impl Default for PrivacyConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortcutsConfig {
+    pub history_popup: String,
+    pub quick_access: String,
+    pub capture_fullscreen: String,
+    pub capture_region: String,
+}
+
+impl Default for ShortcutsConfig {
+    fn default() -> Self {
+        Self {
+            history_popup: "Ctrl+Shift+V".to_string(),
+            quick_access: "Alt+Space".to_string(),
+            capture_fullscreen: "PrintScreen".to_string(),
+            capture_region: "Ctrl+PrintScreen".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppConfig {
     pub clipboard: ClipboardConfig,
     pub screenshots: ScreenshotConfig,
+    pub shortcuts: ShortcutsConfig,
     pub retention: RetentionConfig,
     pub privacy: PrivacyConfig,
 }

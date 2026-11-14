@@ -26,6 +26,7 @@ export interface ShortcutSettings {
   quickAccess: string;
   captureFullscreen: string;
   captureRegion: string;
+  historyPopup: string;
 }
 
 export interface PrivacySettings {

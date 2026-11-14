@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     thumbnailQuality: 'high',
   },
   shortcuts: {
+    historyPopup: 'Ctrl+Shift+V',
     quickAccess: 'Alt+Space',
     captureFullscreen: 'PrintScreen',
     captureRegion: 'Ctrl+Shift+S',
