@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     minimizeToTray: false,
     theme: 'dark',
     defaultView: 'all',
+    popupPosition: 'center',
   },
   clipboard: {
     monitoringEnabled: true,

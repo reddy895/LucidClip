@@ -3,6 +3,7 @@ export interface GeneralSettings {
   minimizeToTray: boolean;
   theme: 'dark';
   defaultView: 'all' | 'clipboard' | 'screenshots' | 'pinned' | 'favorites';
+  popupPosition: 'center' | 'cursor';
 }
 
 export interface ClipboardSettings {
