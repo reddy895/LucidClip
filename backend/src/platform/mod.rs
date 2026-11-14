@@ -19,6 +19,7 @@ pub use focus::{ActiveWindowTarget, FocusManager};
 pub use hotkeys::{
     GlobalShortcutState, GlobalShortcutStatus, ShortcutKey, DEFAULT_HISTORY_SHORTCUT,
 };
+pub use hotkeys_windows::spawn_windows_hotkey_listener;
 pub use paste::{
     synthetic_paste_supported, trigger_paste_keystroke, PasteExecutionResult, PasteMethod,
 };

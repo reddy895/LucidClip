@@ -84,3 +84,68 @@ pub fn register_hotkey(_id: i32, _key: &ShortcutKey) -> Result<()> {
 pub fn unregister_hotkey(_id: i32) -> Result<()> {
     Ok(())
 }
+
+#[cfg(target_os = "windows")]
+pub fn spawn_windows_hotkey_listener<F>(
+    key: ShortcutKey,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    on_triggered: F,
+) -> Result<()>
+where
+    F: Fn() + Send + 'static,
+{
+    use std::sync::mpsc;
+    use std::thread;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, GetMessageW, MSG, WM_HOTKEY,
+    };
+
+    let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<()>>(1);
+
+    thread::Builder::new()
+        .name("lucidclip-windows-hotkeys".into())
+        .spawn(move || {
+            let reg_res = register_hotkey(LUCIDCLIP_HOTKEY_ID, &key);
+            let success = reg_res.is_ok();
+            let _ = ready_tx.send(reg_res);
+
+            if !success {
+                return;
+            }
+
+            let mut msg: MSG = unsafe { std::mem::zeroed() };
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let res = unsafe { GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) };
+                if res <= 0 {
+                    break;
+                }
+
+                if msg.message == WM_HOTKEY && msg.wParam == LUCIDCLIP_HOTKEY_ID as usize {
+                    on_triggered();
+                }
+
+                unsafe {
+                    DispatchMessageW(&msg);
+                }
+            }
+
+            let _ = unregister_hotkey(LUCIDCLIP_HOTKEY_ID);
+        })
+        .map_err(|e| AppError::System(format!("Failed to spawn Windows hotkey thread: {e}")))?;
+
+    ready_rx
+        .recv()
+        .map_err(|_| AppError::System("Hotkey initialization thread dropped".into()))?
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn spawn_windows_hotkey_listener<F>(
+    _key: ShortcutKey,
+    _stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    _on_triggered: F,
+) -> Result<()>
+where
+    F: Fn() + Send + 'static,
+{
+    Ok(())
+}
