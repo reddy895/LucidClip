@@ -128,6 +128,20 @@ fn hide_on_close(app: &tauri::AppHandle) {
     });
 }
 
+fn setup_popup_dismissal(app: &tauri::AppHandle) {
+    if let Some(popup) = app.get_webview_window(crate::platform::POPUP_WINDOW_LABEL) {
+        let popup_for_event = popup.clone();
+        popup.on_window_event(move |event| {
+            if let WindowEvent::Focused(false) = event {
+                let _ = popup_for_event.hide();
+            } else if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = popup_for_event.hide();
+            }
+        });
+    }
+}
+
 /// Main application runner invoked by main.rs
 pub fn run() {
     let app = tauri::Builder::default()
@@ -242,8 +256,12 @@ pub fn run() {
             }
 
             match setup_tray_icon(app.handle()) {
-                Ok(()) => hide_on_close(app.handle()),
+                Ok(()) => {
+                    hide_on_close(app.handle());
+                    setup_popup_dismissal(app.handle());
+                }
                 Err(err) => {
+                    setup_popup_dismissal(app.handle());
                     eprintln!(
                         "[LucidClip] System tray unavailable; closing the window will exit: {err}"
                     );
