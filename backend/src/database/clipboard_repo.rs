@@ -21,9 +21,11 @@ pub struct DbClipboardEntry {
     pub image_height: Option<u32>,
     pub byte_size: u64,
     pub file_count: u32,
+    pub last_used_at: Option<i64>,
+    pub usage_count: u32,
 }
 
-const ENTRY_COLUMNS: &str = "id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count";
+const ENTRY_COLUMNS: &str = "id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count, last_used_at, usage_count";
 
 fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<DbClipboardEntry> {
     Ok(DbClipboardEntry {
@@ -41,6 +43,8 @@ fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<DbClipboardEntry> {
         image_height: row.get(11)?,
         byte_size: row.get::<_, i64>(12)? as u64,
         file_count: row.get::<_, i64>(13)? as u32,
+        last_used_at: row.get(14)?,
+        usage_count: row.get::<_, i64>(15)? as u32,
     })
 }
 
@@ -56,8 +60,8 @@ impl<'a> ClipboardRepo<'a> {
     pub fn insert(&self, entry: &DbClipboardEntry) -> Result<()> {
         self.pool.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO clipboard_entries (id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                "INSERT INTO clipboard_entries (id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count, last_used_at, usage_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 params![
                     entry.id,
                     entry.content,
@@ -73,6 +77,8 @@ impl<'a> ClipboardRepo<'a> {
                     entry.image_height,
                     entry.byte_size as i64,
                     entry.file_count as i64,
+                    entry.last_used_at,
+                    entry.usage_count as i64,
                 ],
             )?;
             Ok(())

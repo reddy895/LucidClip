@@ -87,6 +87,15 @@ pub const MIGRATIONS: &[Migration] = &[
         sql: "CREATE INDEX IF NOT EXISTS idx_clipboard_created_id
               ON clipboard_entries(created_at DESC, id DESC);",
     },
+    Migration {
+        version: 8,
+        description: "track entry usage timestamps, frequency, and source application",
+        sql: "ALTER TABLE clipboard_entries ADD COLUMN last_used_at INTEGER;
+              ALTER TABLE clipboard_entries ADD COLUMN usage_count INTEGER NOT NULL DEFAULT 0;
+              CREATE INDEX IF NOT EXISTS idx_clipboard_last_used ON clipboard_entries(last_used_at DESC);
+              CREATE INDEX IF NOT EXISTS idx_clipboard_source_app ON clipboard_entries(source_app);
+              CREATE INDEX IF NOT EXISTS idx_clipboard_usage_count ON clipboard_entries(usage_count DESC);",
+    },
 ];
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {

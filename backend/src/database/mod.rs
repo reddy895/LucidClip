@@ -37,6 +37,8 @@ mod tests {
             image_height: Some(1080),
             byte_size: 4_096,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
         repo.insert(&entry).expect("failed to insert media entry");
 
@@ -71,6 +73,8 @@ mod tests {
                 image_height: None,
                 byte_size: id.len() as u64,
                 file_count: 0,
+                last_used_at: None,
+                usage_count: 0,
             })
             .unwrap();
         }
@@ -104,6 +108,8 @@ mod tests {
             image_height: None,
             byte_size: 15,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
         clipboard_repo.insert(&entry).expect("failed to insert");
         assert_eq!(clipboard_repo.count().unwrap(), 1);

@@ -199,6 +199,8 @@ mod tests {
             image_height: Some(1),
             byte_size: 4,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         remove(&paths, &entry);
@@ -237,6 +239,8 @@ mod tests {
             image_height: Some(2),
             byte_size: stored.byte_size,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         fs::remove_file(&stored.thumbnail_path).unwrap();
@@ -283,6 +287,8 @@ mod tests {
             image_height: Some(1),
             byte_size: 4,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         assert!(resolve_image_file(&paths, &entry, false).is_err());
@@ -340,6 +346,8 @@ mod tests {
             image_height: Some(2),
             byte_size: stored.byte_size,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
         remove(&paths, &entry);
         assert!(!PathBuf::from(&stored.original_path).exists());

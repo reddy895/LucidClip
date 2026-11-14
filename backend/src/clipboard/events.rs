@@ -52,6 +52,8 @@ mod tests {
             image_height: None,
             byte_size: 5,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         }
     }
 

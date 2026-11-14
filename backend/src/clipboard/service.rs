@@ -85,6 +85,8 @@ impl<'a> ClipboardService<'a> {
             image_height: None,
             byte_size,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         self.repo.insert(&new_entry)?;
@@ -135,6 +137,8 @@ impl<'a> ClipboardService<'a> {
             image_height: Some(stored.height),
             byte_size: stored.byte_size,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         if let Err(err) = self.repo.insert(&new_entry) {
@@ -199,6 +203,8 @@ impl<'a> ClipboardService<'a> {
             image_height: None,
             byte_size: unique.iter().map(|file| file.len() as u64).sum(),
             file_count: file_count as u32,
+            last_used_at: None,
+            usage_count: 0,
         };
 
         self.repo.insert(&new_entry)?;
@@ -613,6 +619,8 @@ mod tests {
             image_height: None,
             byte_size: 3,
             file_count: 0,
+            last_used_at: None,
+            usage_count: 0,
         })
         .unwrap();
 
