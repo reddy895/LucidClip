@@ -6,9 +6,12 @@ pub mod clipboard_linux;
 #[cfg(target_os = "windows")]
 pub mod clipboard_watcher;
 pub mod environment;
+pub mod focus;
 pub mod screenshot;
 pub mod startup;
 pub mod window;
+
+pub use focus::{ActiveWindowTarget, FocusManager};
 
 pub use clipboard::{
     clipboard_content_is_sensitive, clipboard_monitoring_supported, read_clipboard_snapshot,
