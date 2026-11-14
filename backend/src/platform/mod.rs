@@ -8,6 +8,7 @@ pub mod clipboard_watcher;
 pub mod environment;
 pub mod focus;
 pub mod paste;
+pub mod popup_window;
 pub mod screenshot;
 pub mod startup;
 pub mod window;
@@ -15,6 +16,10 @@ pub mod window;
 pub use focus::{ActiveWindowTarget, FocusManager};
 pub use paste::{
     synthetic_paste_supported, trigger_paste_keystroke, PasteExecutionResult, PasteMethod,
+};
+pub use popup_window::{
+    hide_popup_window, is_popup_visible, show_popup_window, toggle_popup_window,
+    POPUP_WINDOW_LABEL,
 };
 
 pub use clipboard::{
