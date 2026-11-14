@@ -125,6 +125,19 @@ impl<'a> ClipboardRepo<'a> {
         })
     }
 
+    pub fn touch(&self, id: &str) -> Result<()> {
+        let now = chrono::Utc::now().timestamp_millis();
+        self.pool.with_conn(|conn| {
+            conn.execute(
+                "UPDATE clipboard_entries
+                 SET last_used_at = ?1, usage_count = usage_count + 1
+                 WHERE id = ?2",
+                params![now, id],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn list_all(&self) -> Result<Vec<DbClipboardEntry>> {
         self.pool.with_conn(|conn| {
             let mut stmt = conn.prepare(&format!(

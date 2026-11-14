@@ -519,8 +519,7 @@ pub fn execute_instant_paste(
     crate::platform::set_clipboard_text(&content)?;
 
     // 4. Update usage touch on entry in DB
-    let _ = crate::database::ClipboardRepo::new(&state.pool)
-        .update_timestamp(&entry_id, chrono::Utc::now().timestamp_millis());
+    let _ = crate::database::ClipboardRepo::new(&state.pool).touch(&entry_id);
 
     // 5. If target active window was preserved, restore focus
     let target_restored = if let Some(ref t) = target {
