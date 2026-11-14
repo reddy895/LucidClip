@@ -470,6 +470,15 @@ pub struct PasteCapabilitiesDto {
 }
 
 #[tauri::command]
+pub fn capture_active_target_window(
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<crate::platform::ActiveWindowTarget>> {
+    let target = crate::platform::capture_foreground_target().unwrap_or(None);
+    state.focus_manager.set_target(target.clone());
+    Ok(target)
+}
+
+#[tauri::command]
 pub fn show_clipboard_popup(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,

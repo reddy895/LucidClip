@@ -279,6 +279,7 @@ pub fn run() {
             commands::get_monitor_status,
             commands::set_monitoring_enabled,
             commands::capture_clipboard_now,
+            commands::capture_active_target_window,
             commands::show_clipboard_popup,
             commands::hide_clipboard_popup,
             commands::get_paste_capabilities,
