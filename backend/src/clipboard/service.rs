@@ -346,14 +346,14 @@ impl<'a> ClipboardService<'a> {
     }
 
     pub fn delete_entry(&self, id: &str) -> Result<bool> {
-        let entry = self.repo.find_by_id(id)?;
-        let deleted = self.repo.delete(id)?;
-        if deleted {
-            if let (Some(paths), Some(entry)) = (self.paths, entry) {
-                media::remove(paths, &entry);
+        let deleted_entry = self.repo.delete_entry_transactional(id)?;
+        if let Some(ref entry) = deleted_entry {
+            if let Some(paths) = self.paths {
+                media::remove(paths, entry);
             }
+            return Ok(true);
         }
-        Ok(deleted)
+        Ok(false)
     }
 
     pub fn clear_unpinned(&self) -> Result<usize> {

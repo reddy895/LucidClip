@@ -2,7 +2,7 @@
 
 use crate::database::connection::DbPool;
 use crate::errors::{AppError, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +240,24 @@ impl<'a> ClipboardRepo<'a> {
         self.pool.with_conn(|conn| {
             let affected = conn.execute("DELETE FROM clipboard_entries WHERE id = ?1", [id])?;
             Ok(affected > 0)
+        })
+    }
+
+    pub fn delete_entry_transactional(&self, id: &str) -> Result<Option<DbClipboardEntry>> {
+        self.pool.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            let entry = {
+                let mut stmt = tx.prepare(&format!(
+                    "SELECT {ENTRY_COLUMNS} FROM clipboard_entries WHERE id = ?1"
+                ))?;
+                stmt.query_row([id], row_to_entry).optional()?
+            };
+
+            if entry.is_some() {
+                tx.execute("DELETE FROM clipboard_entries WHERE id = ?1", [id])?;
+            }
+            tx.commit()?;
+            Ok(entry)
         })
     }
 
