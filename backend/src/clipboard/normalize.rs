@@ -40,6 +40,32 @@ pub fn canonical_text(raw: &str) -> String {
         .to_string()
 }
 
+/// Generate a clean, truncated preview for clipboard history UI rows and popups.
+pub fn format_text_preview(raw: &str, max_lines: usize, max_chars: usize) -> String {
+    let normalized = normalize_text(raw);
+    let trimmed = normalized.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let lines: Vec<&str> = trimmed
+        .lines()
+        .map(str::trim_end)
+        .take(max_lines)
+        .collect();
+
+    let total_lines = trimmed.lines().count();
+    let mut preview = lines.join("\n");
+    if preview.chars().count() > max_chars {
+        let truncated: String = preview.chars().take(max_chars).collect();
+        preview = format!("{}...", truncated.trim_end());
+    } else if total_lines > max_lines {
+        preview.push_str("...");
+    }
+
+    preview
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +96,16 @@ mod tests {
     fn empty_content_normalizes_to_empty() {
         assert_eq!(normalize_text(""), "");
         assert_eq!(canonical_text("\r\n\r\n"), "");
+    }
+
+    #[test]
+    fn format_text_preview_truncates_lines_and_chars() {
+        let multiline = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
+        let preview = format_text_preview(multiline, 2, 50);
+        assert_eq!(preview, "Line 1\nLine 2...");
+
+        let long_line = "This is a very long line that exceeds the maximum preview length of twenty characters";
+        let char_preview = format_text_preview(long_line, 5, 20);
+        assert_eq!(char_preview, "This is a very long...");
     }
 }

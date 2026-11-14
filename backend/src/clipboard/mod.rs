@@ -19,7 +19,7 @@ pub use hasher::hash_content;
 pub use monitor::{
     capture_now, initial_status, spawn as spawn_monitor, status_snapshot, MonitorStatus,
 };
-pub use normalize::{canonical_text, normalize_text};
+pub use normalize::{canonical_text, format_text_preview, normalize_text};
 pub use service::ClipboardService;
 
 #[cfg(test)]
