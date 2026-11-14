@@ -197,7 +197,13 @@ pub fn capture_clipboard_now(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<Option<DbClipboardEntry>> {
-    crate::clipboard::capture_now(&app, &state.pool, &state.paths, &state.monitor_status)
+    crate::clipboard::capture_now(
+        &app,
+        &state.pool,
+        &state.paths,
+        &state.monitor_status,
+        &state.paste_guard,
+    )
 }
 
 // ==========================================

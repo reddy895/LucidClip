@@ -17,6 +17,7 @@ use tauri::{AppHandle, Emitter};
 use crate::clipboard::events::{
     ClipboardCapturedEvent, CLIPBOARD_CAPTURED_EVENT, CLIPBOARD_STATUS_EVENT,
 };
+use crate::clipboard::guard::PasteGuard;
 use crate::clipboard::hasher::hash_content;
 use crate::clipboard::service::ClipboardService;
 use crate::database::{DbClipboardEntry, DbPool, SettingsRepo};
@@ -217,6 +218,7 @@ fn capture_clipboard_once(
     paths: &AppPaths,
     policy: &MonitorPolicy,
     status: &Arc<Mutex<MonitorStatus>>,
+    paste_guard: &PasteGuard,
     force: bool,
 ) -> Option<DbClipboardEntry> {
     let foreground = match platform::foreground_process_name() {
@@ -256,6 +258,9 @@ fn capture_clipboard_once(
             }
 
             let hash = hash_content(&text);
+            if paste_guard.is_internal(&hash) {
+                return None;
+            }
             if !force && last_hash(status).as_deref() == Some(hash.as_str()) {
                 return None;
             }
@@ -274,6 +279,11 @@ fn capture_clipboard_once(
             }
         }
         Ok(Some(ClipboardSnapshot::Image(image))) => {
+            let img_hash = crate::clipboard::media::hash_image(&image);
+            if paste_guard.is_internal(&img_hash) {
+                return None;
+            }
+
             let service = ClipboardService::with_paths(pool, paths);
             match service.process_copied_image(image, foreground) {
                 Ok(entry) => {
@@ -288,6 +298,11 @@ fn capture_clipboard_once(
             }
         }
         Ok(Some(ClipboardSnapshot::Files(files))) => {
+            let files_hash = hash_content(&files.join("\n"));
+            if paste_guard.is_internal(&files_hash) {
+                return None;
+            }
+
             if files.iter().map(String::len).sum::<usize>() > MAX_CAPTURE_CHARS {
                 eprintln!(
                     "[LucidClip Monitor] Skipped file list larger than {MAX_CAPTURE_CHARS} characters."
@@ -348,6 +363,7 @@ fn run_monitor(
     paths: AppPaths,
     stop: Arc<AtomicBool>,
     status: Arc<Mutex<MonitorStatus>>,
+    paste_guard: Arc<PasteGuard>,
 ) {
     println!("[LucidClip Monitor] Clipboard monitor started.");
 
@@ -388,7 +404,7 @@ fn run_monitor(
     let policy = monitor_policy(&pool);
     update_status(&status, |state| state.paused = !policy.enabled);
     if policy.enabled {
-        capture_clipboard_once(&app, &pool, &paths, &policy, &status, false);
+        capture_clipboard_once(&app, &pool, &paths, &policy, &status, &paste_guard, false);
     }
     emit_status(&app, &status);
 
@@ -419,7 +435,7 @@ fn run_monitor(
         let was_paused = !policy.enabled;
         update_status(&status, |state| state.paused = was_paused);
         if policy.enabled {
-            capture_clipboard_once(&app, &pool, &paths, &policy, &status, false);
+            capture_clipboard_once(&app, &pool, &paths, &policy, &status, &paste_guard, false);
         } else {
             // Forget the last fingerprint so resuming captures the current
             // clipboard again instead of silently treating it as a duplicate.
@@ -442,10 +458,11 @@ pub fn capture_now(
     pool: &DbPool,
     paths: &AppPaths,
     status: &Arc<Mutex<MonitorStatus>>,
+    paste_guard: &PasteGuard,
 ) -> Result<Option<DbClipboardEntry>> {
     let policy = monitor_policy(pool);
     let previous_error = status_snapshot(status).last_error;
-    let captured = capture_clipboard_once(app, pool, paths, &policy, status, true);
+    let captured = capture_clipboard_once(app, pool, paths, &policy, status, paste_guard, true);
 
     let current_error = status_snapshot(status).last_error;
     if let Some(error) = current_error {
@@ -463,6 +480,7 @@ pub fn spawn(
     paths: AppPaths,
     stop: Arc<AtomicBool>,
     status: Arc<Mutex<MonitorStatus>>,
+    paste_guard: Arc<PasteGuard>,
 ) {
     if !platform::clipboard_monitoring_supported() {
         let environment = platform::clipboard_environment();
@@ -489,9 +507,10 @@ pub fn spawn(
     }
 
     let thread_status = status.clone();
+    let thread_guard = paste_guard;
     let spawned = thread::Builder::new()
         .name("lucidclip-clipboard-monitor".into())
-        .spawn(move || run_monitor(app, pool, paths, stop, thread_status));
+        .spawn(move || run_monitor(app, pool, paths, stop, thread_status, thread_guard));
 
     if let Err(err) = spawned {
         eprintln!("[LucidClip Monitor] Failed to start monitor thread: {err}");

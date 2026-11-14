@@ -2,6 +2,7 @@
 
 pub mod classifier;
 pub mod events;
+pub mod guard;
 pub mod hasher;
 pub mod media;
 pub mod monitor;
@@ -13,6 +14,7 @@ pub use events::{
     ClipboardCapturedEvent, CLIPBOARD_CAPTURED_EVENT, CLIPBOARD_EVENT_VERSION,
     CLIPBOARD_STATUS_EVENT,
 };
+pub use guard::PasteGuard;
 pub use hasher::hash_content;
 pub use monitor::{
     capture_now, initial_status, spawn as spawn_monitor, status_snapshot, MonitorStatus,

@@ -10,8 +10,9 @@ pub mod screenshots;
 pub mod settings;
 pub mod storage;
 
-use crate::clipboard::MonitorStatus;
+use crate::clipboard::{MonitorStatus, PasteGuard};
 use crate::database::{run_migrations, DbPool};
+use crate::platform::FocusManager;
 use crate::storage::AppPaths;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -29,6 +30,8 @@ pub struct AppState {
     pub paths: AppPaths,
     pub monitor_stop: Arc<AtomicBool>,
     pub monitor_status: Arc<Mutex<MonitorStatus>>,
+    pub paste_guard: Arc<PasteGuard>,
+    pub focus_manager: Arc<FocusManager>,
 }
 
 impl AppState {
@@ -37,12 +40,16 @@ impl AppState {
         paths: AppPaths,
         monitor_stop: Arc<AtomicBool>,
         monitor_status: Arc<Mutex<MonitorStatus>>,
+        paste_guard: Arc<PasteGuard>,
+        focus_manager: Arc<FocusManager>,
     ) -> Self {
         Self {
             pool,
             paths,
             monitor_stop,
             monitor_status,
+            paste_guard,
+            focus_manager,
         }
     }
 }
@@ -180,12 +187,16 @@ pub fn run() {
 
             let monitor_stop = Arc::new(AtomicBool::new(false));
             let monitor_status = Arc::new(Mutex::new(clipboard::initial_status()));
+            let paste_guard = Arc::new(PasteGuard::new());
+            let focus_manager = Arc::new(FocusManager::new());
             let monitor_paths = paths.clone();
             let state = AppState::new(
                 pool.clone(),
                 paths,
                 monitor_stop.clone(),
                 monitor_status.clone(),
+                paste_guard.clone(),
+                focus_manager.clone(),
             );
             app.manage(state);
 
@@ -195,6 +206,7 @@ pub fn run() {
                 monitor_paths,
                 monitor_stop,
                 monitor_status,
+                paste_guard,
             );
 
             match setup_tray_icon(app.handle()) {
