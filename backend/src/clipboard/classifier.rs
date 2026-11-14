@@ -3,8 +3,10 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-static URL_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(https?://|www\.)[^\s/$.?#].[^\s]*$").unwrap());
+static URL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?:(?:https?|ftp|git|ssh|file)://|vscode://|cursor://|mailto:|www\.)[^\s]+$")
+        .unwrap()
+});
 
 static COLOR_HEX_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$").unwrap());

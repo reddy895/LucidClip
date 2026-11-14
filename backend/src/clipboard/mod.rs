@@ -33,6 +33,14 @@ mod tests {
             classify_content("https://github.com/reddy895/LucidClip"),
             ClipboardContentType::Url
         );
+        assert_eq!(
+            classify_content("http://localhost:1420"),
+            ClipboardContentType::Url
+        );
+        assert_eq!(
+            classify_content("vscode://file/home/user/project"),
+            ClipboardContentType::Url
+        );
         assert_eq!(classify_content("#8B9CF7"), ClipboardContentType::ColorCode);
         assert_eq!(
             classify_content("rgb(25, 28, 32)"),
