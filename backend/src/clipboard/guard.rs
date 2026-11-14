@@ -21,6 +21,7 @@ pub struct SuppressedHash {
 pub struct PasteGuard {
     sequence: Arc<AtomicU64>,
     suppressed: Arc<Mutex<Vec<SuppressedHash>>>,
+    last_intercepted_sequence: Arc<AtomicU64>,
 }
 
 impl PasteGuard {
@@ -28,6 +29,7 @@ impl PasteGuard {
         Self {
             sequence: Arc::new(AtomicU64::new(1)),
             suppressed: Arc::new(Mutex::new(Vec::new())),
+            last_intercepted_sequence: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -51,15 +53,24 @@ impl PasteGuard {
     }
 
     /// Test if a given content hash was written by LucidClip and should be ignored.
+    /// If matched, records the intercepted sequence.
     pub fn is_internal(&self, hash: &str) -> bool {
         let now = Utc::now().timestamp_millis();
 
         if let Ok(mut lock) = self.suppressed.lock() {
             lock.retain(|entry| now - entry.created_at < SUPPRESSION_WINDOW_MS);
-            lock.iter().any(|entry| entry.hash == hash)
-        } else {
-            false
+            if let Some(pos) = lock.iter().position(|entry| entry.hash == hash) {
+                let seq = lock[pos].sequence;
+                self.last_intercepted_sequence.store(seq, Ordering::SeqCst);
+                return true;
+            }
         }
+        false
+    }
+
+    /// Return the sequence number of the most recently intercepted internal copy.
+    pub fn last_intercepted_sequence(&self) -> u64 {
+        self.last_intercepted_sequence.load(Ordering::SeqCst)
     }
 
     /// Clear all suppression tags (useful for testing and reset).
@@ -82,6 +93,7 @@ mod tests {
         let seq = guard.mark_internal("sha256-test-hash");
         assert!(seq >= 1);
         assert!(guard.is_internal("sha256-test-hash"));
+        assert_eq!(guard.last_intercepted_sequence(), seq);
         assert!(!guard.is_internal("other-hash"));
 
         guard.clear();
