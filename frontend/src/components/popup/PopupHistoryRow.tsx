@@ -55,7 +55,7 @@ function getTypeIcon(type: ClipboardContentType) {
   }
 }
 
-export const PopupHistoryRow: React.FC<PopupHistoryRowProps> = ({
+export const PopupHistoryRow = React.memo<PopupHistoryRowProps>(({
   entry,
   isSelected,
   shortcutIndex,
@@ -164,6 +164,8 @@ export const PopupHistoryRow: React.FC<PopupHistoryRowProps> = ({
       </div>
     </div>
   );
-};
+});
+
+PopupHistoryRow.displayName = 'PopupHistoryRow';
 
 export default PopupHistoryRow;

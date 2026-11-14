@@ -26,7 +26,7 @@ export interface ClipboardRowProps {
   onSelect: () => void;
 }
 
-export const ClipboardRow: React.FC<ClipboardRowProps> = ({
+export const ClipboardRow = React.memo<ClipboardRowProps>(({
   entry,
   isSelected,
   searchQuery,
@@ -266,5 +266,7 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
       />
     </>
   );
-};
+});
+
+ClipboardRow.displayName = 'ClipboardRow';
 
