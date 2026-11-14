@@ -65,12 +65,18 @@ impl PasteGuard {
                 return true;
             }
         }
+        self.last_intercepted_sequence.store(0, Ordering::SeqCst);
         false
     }
 
     /// Return the sequence number of the most recently intercepted internal copy.
     pub fn last_intercepted_sequence(&self) -> u64 {
         self.last_intercepted_sequence.load(Ordering::SeqCst)
+    }
+
+    /// Explicitly reset the intercepted sequence tag on manual external copies.
+    pub fn reset_intercepted_sequence(&self) {
+        self.last_intercepted_sequence.store(0, Ordering::SeqCst);
     }
 
     /// Clear all suppression tags (useful for testing and reset).
