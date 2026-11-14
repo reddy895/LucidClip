@@ -58,7 +58,7 @@ pub struct MonitorStatus {
     /// Last persisted fingerprint, shared with manual captures so the safety
     /// poll does not immediately re-capture the same clipboard value.
     #[serde(skip)]
-    last_hash: Option<String>,
+    pub(crate) last_hash: Option<String>,
 }
 
 pub fn initial_status() -> MonitorStatus {

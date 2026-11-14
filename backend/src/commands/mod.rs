@@ -185,6 +185,10 @@ pub fn set_monitoring_enabled(
     if let Ok(mut status) = state.monitor_status.lock() {
         status.paused = !enabled;
         status.last_error = None;
+        if enabled {
+            // Reset fingerprint on resume so the active clipboard is immediately captured
+            status.last_hash = None;
+        }
     }
 
     crate::clipboard::monitor::emit_status(&app, &state.monitor_status);
