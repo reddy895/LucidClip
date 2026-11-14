@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { Button, Dialog, Input } from '@/components/ui';
-import { Plus, Download } from 'lucide-react';
+import { Button, Dialog, Input, ConfirmationModal } from '@/components/ui';
+import { Plus, Download, Trash2 } from 'lucide-react';
 import { clipboardService } from '@/services';
 import { useApp } from '@/context';
 import { useToast } from '@/context/ToastContext';
 
 export const ClipboardToolbar: React.FC = () => {
-  const { refreshData } = useApp();
+  const { refreshData, clearClipboardHistory, clipboardItems } = useApp();
   const toast = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [newText, setNewText] = useState('');
   const [newApp, setNewApp] = useState('Manual');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const unpinnedCount = clipboardItems.filter((i) => !i.isPinned && !i.isFavorite).length;
 
   const handleCreate = async () => {
     if (!newText.trim()) return;
@@ -61,7 +64,30 @@ export const ClipboardToolbar: React.FC = () => {
         >
           Export
         </Button>
+        {unpinnedCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 className="h-3.5 w-3.5 text-graphite-text-muted hover:text-status-error" />}
+            onClick={() => setIsClearModalOpen(true)}
+          >
+            Clear ({unpinnedCount})
+          </Button>
+        )}
       </div>
+
+      <ConfirmationModal
+        isOpen={isClearModalOpen}
+        onClose={() => setIsClearModalOpen(false)}
+        onConfirm={async () => {
+          await clearClipboardHistory();
+          setIsClearModalOpen(false);
+        }}
+        title="Clear Unpinned History"
+        description={`Are you sure you want to delete ${unpinnedCount} unpinned entries? Pinned entries, favorites, and screenshots will be preserved.`}
+        confirmText="Clear Unpinned"
+        isDestructive={true}
+      />
 
       <Dialog
         isOpen={isAddModalOpen}
