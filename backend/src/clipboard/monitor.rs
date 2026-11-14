@@ -357,6 +357,145 @@ fn record_capture(app: &AppHandle, status: &Arc<Mutex<MonitorStatus>>, entry: &D
     emit_status(app, status);
 }
 
+struct ClipboardMonitorWorker {
+    app: AppHandle,
+    pool: Arc<DbPool>,
+    paths: AppPaths,
+    stop: Arc<AtomicBool>,
+    status: Arc<Mutex<MonitorStatus>>,
+    paste_guard: Arc<PasteGuard>,
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    native_notifications: Option<mpsc::Receiver<()>>,
+}
+
+impl ClipboardMonitorWorker {
+    fn new(
+        app: AppHandle,
+        pool: Arc<DbPool>,
+        paths: AppPaths,
+        stop: Arc<AtomicBool>,
+        status: Arc<Mutex<MonitorStatus>>,
+        paste_guard: Arc<PasteGuard>,
+    ) -> Self {
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        let native_notifications = {
+            let (notify_tx, notify_rx) = mpsc::sync_channel::<()>(1);
+            let result = {
+                #[cfg(target_os = "windows")]
+                {
+                    platform::spawn_clipboard_watcher(notify_tx, stop.clone())
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    platform::spawn_clipboard_watcher(notify_tx)
+                }
+            };
+
+            match result {
+                Ok(()) => Some(notify_rx),
+                Err(err) => {
+                    eprintln!(
+                        "[LucidClip Monitor] Native notifications unavailable ({err}); using polling fallback."
+                    );
+                    None
+                }
+            }
+        };
+
+        Self {
+            app,
+            pool,
+            paths,
+            stop,
+            status,
+            paste_guard,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            native_notifications,
+        }
+    }
+
+    fn run(self) {
+        println!("[LucidClip Monitor] Clipboard monitor worker started.");
+
+        update_status(&self.status, |state| {
+            state.running = true;
+            state.started_at = Some(Utc::now().timestamp_millis());
+        });
+
+        // Capture the current clipboard once at startup.
+        let policy = monitor_policy(&self.pool);
+        update_status(&self.status, |state| state.paused = !policy.enabled);
+        if policy.enabled {
+            capture_clipboard_once(
+                &self.app,
+                &self.pool,
+                &self.paths,
+                &policy,
+                &self.status,
+                &self.paste_guard,
+                false,
+            );
+        }
+        emit_status(&self.app, &self.status);
+
+        while !self.stop.load(Ordering::Relaxed) {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            let wait_result = match &self.native_notifications {
+                Some(receiver) => receiver.recv_timeout(SAFETY_POLL_INTERVAL),
+                None => {
+                    thread::sleep(POLL_INTERVAL);
+                    Err(RecvTimeoutError::Timeout)
+                }
+            };
+
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            let wait_result: std::result::Result<(), RecvTimeoutError> = {
+                thread::sleep(POLL_INTERVAL);
+                Err(RecvTimeoutError::Timeout)
+            };
+
+            if self.stop.load(Ordering::Relaxed) {
+                break;
+            }
+
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            if matches!(wait_result, Ok(())) {
+                // Let the source application finish publishing every format, then
+                // drain any queued notifications into this single capture.
+                thread::sleep(DEBOUNCE_INTERVAL);
+                while self
+                    .native_notifications
+                    .as_ref()
+                    .is_some_and(|receiver| receiver.try_recv().is_ok())
+                {}
+            }
+
+            let policy = monitor_policy(&self.pool);
+            let was_paused = !policy.enabled;
+            update_status(&self.status, |state| state.paused = was_paused);
+            if policy.enabled {
+                capture_clipboard_once(
+                    &self.app,
+                    &self.pool,
+                    &self.paths,
+                    &policy,
+                    &self.status,
+                    &self.paste_guard,
+                    false,
+                );
+            } else {
+                // Forget the last fingerprint so resuming captures the current
+                // clipboard again instead of silently treating it as a duplicate.
+                set_last_hash(&self.status, None);
+            }
+        }
+
+        update_status(&self.status, |state| state.running = false);
+        emit_status(&self.app, &self.status);
+        println!("[LucidClip Monitor] Clipboard monitor worker stopped.");
+    }
+}
+
 fn run_monitor(
     app: AppHandle,
     pool: Arc<DbPool>,
@@ -365,87 +504,8 @@ fn run_monitor(
     status: Arc<Mutex<MonitorStatus>>,
     paste_guard: Arc<PasteGuard>,
 ) {
-    println!("[LucidClip Monitor] Clipboard monitor started.");
-
-    update_status(&status, |state| {
-        state.running = true;
-        state.started_at = Some(Utc::now().timestamp_millis());
-    });
-
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    let native_notifications = {
-        let (notify_tx, notify_rx) = mpsc::sync_channel::<()>(1);
-        let result = {
-            #[cfg(target_os = "windows")]
-            {
-                platform::spawn_clipboard_watcher(notify_tx, stop.clone())
-            }
-            #[cfg(target_os = "linux")]
-            {
-                platform::spawn_clipboard_watcher(notify_tx)
-            }
-        };
-
-        match result {
-            Ok(()) => Some(notify_rx),
-            Err(err) => {
-                eprintln!(
-                    "[LucidClip Monitor] Native notifications unavailable ({err}); using polling fallback."
-                );
-                None
-            }
-        }
-    };
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    let native_notifications: Option<mpsc::Receiver<()>> = None;
-
-    // Capture the current clipboard once at startup.
-    let policy = monitor_policy(&pool);
-    update_status(&status, |state| state.paused = !policy.enabled);
-    if policy.enabled {
-        capture_clipboard_once(&app, &pool, &paths, &policy, &status, &paste_guard, false);
-    }
-    emit_status(&app, &status);
-
-    while !stop.load(Ordering::Relaxed) {
-        let wait_result = match &native_notifications {
-            Some(receiver) => receiver.recv_timeout(SAFETY_POLL_INTERVAL),
-            None => {
-                thread::sleep(POLL_INTERVAL);
-                Err(RecvTimeoutError::Timeout)
-            }
-        };
-
-        if stop.load(Ordering::Relaxed) {
-            break;
-        }
-
-        if matches!(wait_result, Ok(())) {
-            // Let the source application finish publishing every format, then
-            // drain any queued notifications into this single capture.
-            thread::sleep(DEBOUNCE_INTERVAL);
-            while native_notifications
-                .as_ref()
-                .is_some_and(|receiver| receiver.try_recv().is_ok())
-            {}
-        }
-
-        let policy = monitor_policy(&pool);
-        let was_paused = !policy.enabled;
-        update_status(&status, |state| state.paused = was_paused);
-        if policy.enabled {
-            capture_clipboard_once(&app, &pool, &paths, &policy, &status, &paste_guard, false);
-        } else {
-            // Forget the last fingerprint so resuming captures the current
-            // clipboard again instead of silently treating it as a duplicate.
-            set_last_hash(&status, None);
-        }
-    }
-
-    update_status(&status, |state| state.running = false);
-    emit_status(&app, &status);
-    println!("[LucidClip Monitor] Clipboard monitor stopped.");
+    let worker = ClipboardMonitorWorker::new(app, pool, paths, stop, status, paste_guard);
+    worker.run();
 }
 
 /// Capture the clipboard immediately on explicit user request.
