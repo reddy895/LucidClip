@@ -12,7 +12,7 @@ static COLOR_HEX_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$").unwrap());
 
 static COLOR_FUNC_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(rgb|rgba|hsl|hsla)\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+\s*)?\)$").unwrap()
+    Regex::new(r"^(rgb|rgba|hsl|hsla)\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?(?:\s*,\s*[\d.]+%?\s*)?\)$").unwrap()
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
