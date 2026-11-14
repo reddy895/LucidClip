@@ -246,7 +246,11 @@ pub fn run() {
             commands::get_clipboard_diagnostics,
             commands::get_monitor_status,
             commands::set_monitoring_enabled,
-            commands::capture_clipboard_now
+            commands::capture_clipboard_now,
+            commands::show_clipboard_popup,
+            commands::hide_clipboard_popup,
+            commands::get_paste_capabilities,
+            commands::execute_instant_paste
         ])
         .build(tauri::generate_context!())
         .expect("error while building LucidClip desktop application");

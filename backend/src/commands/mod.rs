@@ -450,3 +450,92 @@ fn directory_size(path: &std::path::Path) -> Result<u64> {
 
     Ok(total)
 }
+
+// ==========================================
+// Focus & Instant Paste Commands
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasteCapabilitiesDto {
+    pub os: String,
+    pub session: String,
+    pub global_shortcuts_supported: bool,
+    pub focus_restoration_supported: bool,
+    pub synthetic_paste_supported: bool,
+    pub diagnostics: Vec<String>,
+}
+
+#[tauri::command]
+pub fn show_clipboard_popup(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<crate::platform::ActiveWindowTarget>> {
+    let target = crate::platform::capture_foreground_target().unwrap_or(None);
+    state.focus_manager.set_target(target.clone());
+    crate::platform::show_popup_window(&app)?;
+    Ok(target)
+}
+
+#[tauri::command]
+pub fn hide_clipboard_popup(app: tauri::AppHandle) -> Result<()> {
+    crate::platform::hide_popup_window(&app)
+}
+
+#[tauri::command]
+pub fn get_paste_capabilities() -> Result<PasteCapabilitiesDto> {
+    let env = crate::platform::clipboard_environment();
+    Ok(PasteCapabilitiesDto {
+        os: env.os,
+        session: env.session.as_str().to_string(),
+        global_shortcuts_supported: true,
+        focus_restoration_supported: crate::platform::focus_restoration_supported(),
+        synthetic_paste_supported: crate::platform::synthetic_paste_supported(),
+        diagnostics: env.diagnostics,
+    })
+}
+
+#[tauri::command]
+pub fn execute_instant_paste(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    entry_id: String,
+    content: String,
+    _content_type: String,
+) -> Result<crate::platform::PasteExecutionResult> {
+    let target = state.focus_manager.get_target();
+
+    // 1. Hide popup window first
+    let _ = crate::platform::hide_popup_window(&app);
+
+    // 2. Mark hash in paste guard to prevent monitor re-capture
+    let hash = crate::clipboard::hash_content(&content);
+    state.paste_guard.mark_internal(&hash);
+
+    // 3. Put content onto system clipboard
+    crate::platform::set_clipboard_text(&content)?;
+
+    // 4. Update usage touch on entry in DB
+    let _ = crate::database::ClipboardRepo::new(&state.pool)
+        .update_timestamp(&entry_id, chrono::Utc::now().timestamp_millis());
+
+    // 5. If target active window was preserved, restore focus
+    let target_restored = if let Some(ref t) = target {
+        crate::platform::restore_target_focus(t).unwrap_or(false)
+    } else {
+        false
+    };
+
+    // 6. If synthetic paste is supported on this platform, trigger it
+    if crate::platform::synthetic_paste_supported() {
+        let injected = crate::platform::trigger_paste_keystroke().unwrap_or(false);
+        if injected {
+            return Ok(crate::platform::PasteExecutionResult::success(target_restored));
+        }
+    }
+
+    // Fallback: clipboard was set, inform user or frontend
+    Ok(crate::platform::PasteExecutionResult::clipboard_fallback(
+        target_restored,
+        "Content copied to clipboard. Press Ctrl+V in target application.",
+    ))
+}
