@@ -329,8 +329,9 @@ fn capture_clipboard_once(
             set_last_hash(status, None);
         }
         Err(err) => {
-            // Clipboard contention is expected; retry on the next tick.
-            fail(app, status, format!("Clipboard read skipped: {err}"));
+            // Transient clipboard contention is normal during external multi-format writes;
+            // update status and allow subsequent tick or burst debounce to recover.
+            fail(app, status, format!("Clipboard read contention: {err}"));
         }
     }
 

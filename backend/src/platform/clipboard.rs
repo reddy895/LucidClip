@@ -73,16 +73,17 @@ mod windows_clipboard {
 
     impl ClipboardSession {
         fn open() -> Result<Self> {
-            // Another process may briefly hold the clipboard; retry with a short backoff.
-            for _ in 0..10 {
+            // Another process may briefly hold the clipboard; retry with an adaptive backoff.
+            for attempt in 1..=15 {
                 if unsafe { OpenClipboard(ptr::null_mut()) } != 0 {
                     return Ok(Self);
                 }
-                thread::sleep(Duration::from_millis(10));
+                let backoff = (attempt * 5).min(50);
+                thread::sleep(Duration::from_millis(backoff));
             }
 
             Err(AppError::Clipboard(
-                "Could not open the Windows clipboard after retrying".into(),
+                "Could not open the Windows clipboard after retrying due to lock contention".into(),
             ))
         }
     }
