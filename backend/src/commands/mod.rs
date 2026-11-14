@@ -543,3 +543,18 @@ pub fn execute_instant_paste(
         "Content copied to clipboard. Press Ctrl+V in target application.",
     ))
 }
+
+#[tauri::command]
+pub fn get_global_shortcut_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<crate::platform::GlobalShortcutStatus> {
+    Ok(state.hotkeys.status())
+}
+
+#[tauri::command]
+pub fn update_global_shortcut(
+    state: tauri::State<'_, AppState>,
+    shortcut: String,
+) -> Result<crate::platform::GlobalShortcutStatus> {
+    state.hotkeys.update_shortcut(&shortcut)
+}

@@ -173,6 +173,19 @@ impl GlobalShortcutService {
     pub fn stop(&self) {
         self.listener_stop.store(true, Ordering::SeqCst);
     }
+
+    pub fn status(&self) -> GlobalShortcutStatus {
+        let supported = cfg!(target_os = "windows")
+            || (cfg!(target_os = "linux") && std::env::var("DISPLAY").is_ok());
+        self.state.status(supported)
+    }
+
+    pub fn update_shortcut(&self, raw: &str) -> Result<GlobalShortcutStatus> {
+        let key = probe_shortcut_availability(raw)?;
+        let canonical = key.canonical();
+        self.state.set_active(&canonical, true, None);
+        Ok(self.status())
+    }
 }
 
 /// Validate and probe whether a shortcut string is syntactically valid and non-conflicting.
