@@ -23,7 +23,7 @@ pub struct ShortcutKey {
 impl ShortcutKey {
     /// Parse a shortcut specification string such as "Ctrl+Shift+V" or "CommandOrControl+Shift+V".
     pub fn parse(raw: &str) -> Result<Self> {
-        let parts: Vec<&str> = raw.split('+').map(str::trim).filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = raw.split('+').map(str::trim).collect();
         if parts.is_empty() {
             return Err(AppError::InvalidInput("Shortcut cannot be empty".into()));
         }
@@ -35,6 +35,9 @@ impl ShortcutKey {
         let mut key = String::new();
 
         for part in parts {
+            if part.is_empty() {
+                return Err(AppError::InvalidInput("Shortcut part cannot be empty".into()));
+            }
             let lower = part.to_lowercase();
             match lower.as_str() {
                 "ctrl" | "control" | "commandorcontrol" | "cmdorctrl" => ctrl = true,
