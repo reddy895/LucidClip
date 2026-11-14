@@ -44,3 +44,5 @@ export const searchService = new HistorySearchService(
   clipboardService,
   screenshotService
 );
+
+export { pasteService } from './tauri/TauriPasteService';
