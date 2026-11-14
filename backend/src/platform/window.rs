@@ -269,7 +269,14 @@ mod windows_window {
         let foreground_set = unsafe { SetForegroundWindow(hwnd) != 0 };
         let _ = unsafe { SetFocus(hwnd) };
 
+        // Allow target process foreground window activation permission
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(target.process_id);
+        }
+
         if attached {
+            // Keep thread input attached across a micro-yield so target thread processes the focus event
+            std::thread::sleep(std::time::Duration::from_millis(15));
             unsafe {
                 AttachThreadInput(current_thread, target.thread_id, 0);
             }
