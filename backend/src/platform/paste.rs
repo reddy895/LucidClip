@@ -100,6 +100,8 @@ pub(crate) mod linux_paste {
             .unwrap_or(false)
     }
 
+    pub const LINUX_FOCUS_SETTLE_DELAY_MS: u64 = 45;
+
     pub fn trigger_ctrl_v() -> Result<bool> {
         let env = clipboard_environment();
         if env.session != ClipboardSession::X11 {
@@ -108,7 +110,7 @@ pub(crate) mod linux_paste {
         }
 
         // Brief delay to allow window focus switch to settle
-        std::thread::sleep(std::time::Duration::from_millis(35));
+        std::thread::sleep(std::time::Duration::from_millis(LINUX_FOCUS_SETTLE_DELAY_MS));
 
         // Attempt xdotool key injection
         let status = Command::new("xdotool")
@@ -130,9 +132,11 @@ pub(crate) mod windows_paste {
     const VK_CONTROL: u8 = 0x11;
     const VK_V: u8 = 0x56;
 
+    pub const WINDOWS_FOCUS_SETTLE_DELAY_MS: u64 = 45;
+
     pub fn trigger_ctrl_v() -> Result<bool> {
         // Sleep briefly to ensure window manager has switched focus to target window
-        std::thread::sleep(std::time::Duration::from_millis(25));
+        std::thread::sleep(std::time::Duration::from_millis(WINDOWS_FOCUS_SETTLE_DELAY_MS));
 
         unsafe {
             // Control DOWN
