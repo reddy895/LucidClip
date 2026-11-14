@@ -5,6 +5,7 @@ import { Badge, Tooltip, ContextMenu, ContextMenuItem } from '@/components/ui';
 import { HighlightText } from '@/components/search';
 import {
   Copy,
+  Check,
   Pin,
   Star,
   Trash2,
@@ -32,6 +33,7 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
   onSelect,
 }) => {
   const { copyItem, togglePin, toggleFavorite, deleteItem } = useApp();
+  const [justCopied, setJustCopied] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const clipboardImage = useMediaImageUrl(
     'clipboard',
@@ -181,17 +183,23 @@ export const ClipboardRow: React.FC<ClipboardRowProps> = ({
 
           {/* Hover Actions */}
           <div className="hidden group-hover:flex items-center gap-1">
-            <Tooltip content="Copy (Enter)">
+            <Tooltip content={justCopied ? 'Copied!' : 'Copy (Enter)'}>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   copyItem(asHistoryItem);
+                  setJustCopied(true);
+                  setTimeout(() => setJustCopied(false), 1200);
                 }}
                 aria-label="Copy entry"
                 className="flex h-6 w-6 items-center justify-center rounded-btn text-graphite-text-secondary hover:text-graphite-text-primary hover:bg-graphite-hover transition-colors"
               >
-                <Copy className="h-3 w-3" />
+                {justCopied ? (
+                  <Check className="h-3 w-3 text-status-success" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
               </button>
             </Tooltip>
 
