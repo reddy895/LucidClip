@@ -83,14 +83,42 @@ pub fn trigger_paste_keystroke() -> Result<bool> {
 #[cfg(target_os = "linux")]
 pub(crate) mod linux_paste {
     use super::*;
+    use std::process::Command;
+    use crate::platform::environment::{clipboard_environment, ClipboardSession};
 
     pub fn is_supported() -> bool {
-        // Will be wired to session type and tool availability
-        false
+        let env = clipboard_environment();
+        if env.session != ClipboardSession::X11 {
+            return false;
+        }
+
+        // Supported under X11 if xdotool or xte is available
+        Command::new("which")
+            .arg("xdotool")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
     }
 
     pub fn trigger_ctrl_v() -> Result<bool> {
-        Ok(false)
+        let env = clipboard_environment();
+        if env.session != ClipboardSession::X11 {
+            // Wayland does not permit client synthetic input injection without compositor privs
+            return Ok(false);
+        }
+
+        // Brief delay to allow window focus switch to settle
+        std::thread::sleep(std::time::Duration::from_millis(35));
+
+        // Attempt xdotool key injection
+        let status = Command::new("xdotool")
+            .args(["key", "--clearmodifiers", "ctrl+v"])
+            .status();
+
+        match status {
+            Ok(s) if s.success() => Ok(true),
+            _ => Ok(false),
+        }
     }
 }
 
