@@ -7,6 +7,7 @@ pub mod clipboard_linux;
 pub mod clipboard_watcher;
 pub mod environment;
 pub mod focus;
+pub mod hotkeys;
 pub mod paste;
 pub mod popup_window;
 pub mod screenshot;
@@ -14,6 +15,9 @@ pub mod startup;
 pub mod window;
 
 pub use focus::{ActiveWindowTarget, FocusManager};
+pub use hotkeys::{
+    GlobalShortcutState, GlobalShortcutStatus, ShortcutKey, DEFAULT_HISTORY_SHORTCUT,
+};
 pub use paste::{
     synthetic_paste_supported, trigger_paste_keystroke, PasteExecutionResult, PasteMethod,
 };
