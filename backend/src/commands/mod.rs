@@ -509,6 +509,17 @@ pub fn hide_popup_and_restore_focus(
 }
 
 #[tauri::command]
+pub fn set_clipboard_with_internal_guard(
+    state: tauri::State<'_, AppState>,
+    content: String,
+) -> Result<String> {
+    let hash = crate::clipboard::hash_content(&content);
+    state.paste_guard.mark_internal(&hash);
+    crate::platform::set_clipboard_text(&content)?;
+    Ok(hash)
+}
+
+#[tauri::command]
 pub fn get_paste_capabilities() -> Result<PasteCapabilitiesDto> {
     let env = crate::platform::clipboard_environment();
     Ok(PasteCapabilitiesDto {
