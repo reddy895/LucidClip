@@ -52,4 +52,20 @@ impl DbPool {
             .map_err(|e| AppError::Database(format!("Failed to acquire database lock: {e}")))?;
         f(&mut guard)
     }
+
+    /// Check SQLite database integrity using PRAGMA integrity_check
+    pub fn pragma_integrity_check(&self) -> Result<bool> {
+        self.with_conn(|conn| {
+            let result: String = conn.query_row("PRAGMA integrity_check;", [], |row| row.get(0))?;
+            Ok(result == "ok")
+        })
+    }
+
+    /// Run WAL checkpoint maintenance to truncate WAL journal and prevent file growth
+    pub fn wal_checkpoint(&self) -> Result<()> {
+        self.with_conn(|conn| {
+            conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+            Ok(())
+        })
+    }
 }
