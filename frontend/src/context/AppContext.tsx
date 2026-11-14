@@ -431,6 +431,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updated = await settingsService.updateSettings(partial);
       setSettings(updated);
+
+      if (partial.shortcuts?.historyPopup && isTauri()) {
+        import('@tauri-apps/api/core')
+          .then(({ invoke }) => {
+            invoke('update_global_shortcut', { shortcut: partial.shortcuts!.historyPopup }).catch(
+              (err) => {
+                console.warn('[LucidClip] Failed to update global shortcut:', err);
+              }
+            );
+          })
+          .catch(() => {});
+      }
+
       toast.info('Settings saved.');
     } catch (err) {
       reportActionError('Save settings', err);
