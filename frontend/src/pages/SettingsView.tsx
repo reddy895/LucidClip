@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context';
+import { pasteService } from '@/services';
+import { PasteCapabilities } from '@/types/paste';
 import {
   SectionHeader,
   Toggle,
@@ -48,6 +50,11 @@ export const SettingsView: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isClearDataModalOpen, setIsClearDataModalOpen] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [pasteCaps, setPasteCaps] = useState<PasteCapabilities | null>(null);
+
+  useEffect(() => {
+    pasteService.getPasteCapabilities().then(setPasteCaps).catch(() => {});
+  }, []);
 
   const monitoringSupported =
     monitorStatus?.supported ?? clipboardDiagnostics?.monitoring_supported ?? true;
@@ -537,6 +544,59 @@ export const SettingsView: React.FC = () => {
                   </div>
                 ))}
               </SettingsSection>
+
+              {pasteCaps && (
+                <SettingsSection
+                  title="Platform Capability Diagnostics"
+                  description="Hardware and desktop environment features available for system-wide shortcuts and paste injection."
+                >
+                  <div className="grid grid-cols-3 gap-2 py-1">
+                    <div className="p-2.5 rounded bg-graphite-surface border border-graphite-border">
+                      <div className="text-[10px] text-graphite-text-muted uppercase font-mono">Global Shortcuts</div>
+                      <div className="text-xs font-medium text-graphite-text-primary mt-0.5">
+                        {pasteCaps.globalShortcutsSupported ? (
+                          <span className="text-status-success">Supported</span>
+                        ) : (
+                          <span className="text-status-error">Unsupported</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded bg-graphite-surface border border-graphite-border">
+                      <div className="text-[10px] text-graphite-text-muted uppercase font-mono">Focus Restoration</div>
+                      <div className="text-xs font-medium text-graphite-text-primary mt-0.5">
+                        {pasteCaps.focusRestorationSupported ? (
+                          <span className="text-status-success">Active</span>
+                        ) : (
+                          <span className="text-status-warning">Manual Focus</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded bg-graphite-surface border border-graphite-border">
+                      <div className="text-[10px] text-graphite-text-muted uppercase font-mono">Instant Paste (Ctrl+V)</div>
+                      <div className="text-xs font-medium text-graphite-text-primary mt-0.5">
+                        {pasteCaps.syntheticPasteSupported ? (
+                          <span className="text-status-success">Synthetic Input</span>
+                        ) : (
+                          <span className="text-status-warning">Clipboard Only</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {pasteCaps.diagnostics.length > 0 && (
+                    <div className="mt-2 text-[11px] text-graphite-text-muted space-y-0.5 font-mono">
+                      {pasteCaps.diagnostics.map((diag, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-graphite-text-muted" />
+                          <span>{diag}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SettingsSection>
+              )}
             </div>
           )}
 
