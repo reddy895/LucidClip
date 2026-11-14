@@ -574,11 +574,13 @@ pub fn execute_instant_paste(
     // 6. If synthetic paste is supported on this platform, trigger it
     if crate::platform::synthetic_paste_supported() {
         let injected = crate::platform::trigger_paste_keystroke().unwrap_or(false);
+        state.focus_manager.clear();
         if injected {
             return Ok(crate::platform::PasteExecutionResult::success(target_restored));
         }
     }
 
+    state.focus_manager.clear();
     // Fallback: clipboard was set, inform user or frontend
     Ok(crate::platform::PasteExecutionResult::clipboard_fallback(
         target_restored,
