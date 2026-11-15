@@ -109,6 +109,7 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   const { selectedIndex, setSelectedIndex, handleKeyDown } = usePopupKeyboardNavigation({
     items: filteredItems,
     onSelectAndPaste: (entry) => handleSelectAction(entry, false),
+    onCopyOnly: (entry) => handleSelectAction(entry, true),
   });
 
   const handleClose = useCallback(() => {

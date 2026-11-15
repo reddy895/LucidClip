@@ -3,12 +3,14 @@ import { useState, useCallback, useEffect } from 'react';
 export interface UsePopupKeyboardNavigationOptions<T> {
   items: T[];
   onSelectAndPaste: (item: T) => void;
+  onCopyOnly?: (item: T) => void;
   initialIndex?: number;
 }
 
 export function usePopupKeyboardNavigation<T>({
   items,
   onSelectAndPaste,
+  onCopyOnly,
   initialIndex = 0,
 }: UsePopupKeyboardNavigationOptions<T>) {
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
@@ -71,7 +73,11 @@ export function usePopupKeyboardNavigation<T>({
         case 'Enter':
           e.preventDefault();
           if (items[selectedIndex]) {
-            onSelectAndPaste(items[selectedIndex]);
+            if (e.shiftKey && onCopyOnly) {
+              onCopyOnly(items[selectedIndex]);
+            } else {
+              onSelectAndPaste(items[selectedIndex]);
+            }
           }
           break;
 
@@ -79,7 +85,7 @@ export function usePopupKeyboardNavigation<T>({
           break;
       }
     },
-    [items, selectedIndex, onSelectAndPaste]
+    [items, selectedIndex, onSelectAndPaste, onCopyOnly]
   );
 
   return {
