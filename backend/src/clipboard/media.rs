@@ -135,13 +135,14 @@ pub fn remove(paths: &AppPaths, entry: &DbClipboardEntry) {
             continue;
         };
         let path = Path::new(candidate);
-        if !path.starts_with(&paths.screenshots_dir) {
+        if !paths.owns_media_path(path) {
             eprintln!(
                 "[LucidClip Clipboard] Refusing to remove media outside the app data directory: {candidate}"
             );
             continue;
         }
-        remove_file_if_exists(path);
+        let normalized = paths.normalize_media_path(path);
+        remove_file_if_exists(&normalized);
     }
 }
 
