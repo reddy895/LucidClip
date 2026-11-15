@@ -41,6 +41,14 @@ impl ClipboardCapturedEvent {
             self.entry.source_app.as_deref().unwrap_or("unknown")
         )
     }
+
+    pub fn is_image(&self) -> bool {
+        self.entry.content_type == "image"
+    }
+
+    pub fn has_thumbnail(&self) -> bool {
+        self.entry.thumbnail_path.is_some()
+    }
 }
 
 #[cfg(test)]
