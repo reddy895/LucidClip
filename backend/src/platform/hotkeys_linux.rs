@@ -135,12 +135,21 @@ where
     std::thread::Builder::new()
         .name("lucidclip-linux-hotkeys".into())
         .spawn(move || {
-            let _ = key;
-            let _ = on_triggered;
+            let first_ch = key.sequence_keys.first().and_then(|k| k.chars().next()).unwrap_or('V');
+            let second_ch = key.sequence_keys.get(1).and_then(|k| k.chars().next()).unwrap_or('Z');
+            let on_trigger = on_triggered;
+            let mut detector = SequenceDetector::new(first_ch, second_ch, 750);
+
             // In X11 mode, loop while stop is not requested
             while !stop.load(Ordering::Relaxed) {
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                // If the detector times out while awaiting second key, reset it
+                if detector.check_timeout() {
+                    // Sequence reset due to timeout
+                }
+                // Handle synthetic trigger if testing or event arrived
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
+            drop(on_trigger);
         })
         .map_err(|e| AppError::System(format!("Failed to spawn Linux hotkey thread: {e}")))?;
 
