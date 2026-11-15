@@ -378,20 +378,39 @@ pub(crate) fn image_data_url(path: &Path) -> Result<ScreenshotImageData> {
             path.display()
         ))
     })?;
-    let mime_type = match path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("webp") => "image/webp",
-        _ => "image/png",
+
+    if bytes.is_empty() {
+        return Err(AppError::CorruptImage(format!(
+            "Screenshot image {} is empty (0 bytes)",
+            path.display()
+        )));
+    }
+
+    // Inspect magic bytes to confirm valid image header
+    let detected_mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "image/png"
+    } else if bytes.starts_with(b"\xff\xd8\xff") {
+        "image/jpeg"
+    } else if bytes.len() > 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else if bytes.starts_with(b"BM") {
+        "image/bmp"
+    } else {
+        match path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("webp") => "image/webp",
+            _ => "image/png",
+        }
     };
 
     Ok(ScreenshotImageData {
-        mime_type: mime_type.to_string(),
-        data_url: format!("data:{mime_type};base64,{}", STANDARD.encode(bytes)),
+        mime_type: detected_mime.to_string(),
+        data_url: format!("data:{detected_mime};base64,{}", STANDARD.encode(bytes)),
     })
 }
 
