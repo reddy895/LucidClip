@@ -143,9 +143,35 @@ fn read_files_on_main(clipboard: &gtk::Clipboard) -> Option<Vec<String>> {
 }
 
 fn read_image_on_main(clipboard: &gtk::Clipboard) -> Option<CapturedImage> {
-    clipboard
-        .wait_for_image()
-        .and_then(|pixbuf| pixbuf_to_captured(&pixbuf))
+    if let Some(pixbuf) = clipboard.wait_for_image() {
+        if let Some(captured) = pixbuf_to_captured(&pixbuf) {
+            return Some(captured);
+        }
+    }
+
+    // Fallback: probe raw image target formats if GTK pixbuf decoding was bypassed
+    for target in ["image/png", "image/jpeg", "image/bmp"] {
+        let atom = gdk::Atom::intern(target);
+        if let Some(selection_data) = clipboard.wait_for_contents(&atom) {
+            let data = selection_data.data();
+            if !data.is_empty() {
+                if let Ok(dynamic) = image::load_from_memory(&data) {
+                    let rgba_img = dynamic.to_rgba8();
+                    let width = rgba_img.width();
+                    let height = rgba_img.height();
+                    if width > 0 && height > 0 && (width as u64 * height as u64) <= MAX_IMAGE_PIXELS {
+                        return Some(CapturedImage {
+                            width,
+                            height,
+                            rgba: rgba_img.into_raw(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 fn pixbuf_to_captured(pixbuf: &gdk_pixbuf::Pixbuf) -> Option<CapturedImage> {
