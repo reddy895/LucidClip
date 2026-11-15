@@ -140,12 +140,16 @@ export const ClipboardRow = React.memo<ClipboardRowProps>(({
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {entry.contentType === 'image' &&
           clipboardImage.state === 'ready' &&
-          clipboardImage.url ? (
+          typeof clipboardImage.url === 'string' &&
+          clipboardImage.url.startsWith('data:') ? (
             <img
               src={clipboardImage.url}
               alt="Clipboard image thumbnail"
               className="h-8 w-11 shrink-0 rounded-[3px] border border-graphite-border object-cover"
               loading="lazy"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
             />
           ) : (
             <Badge variant={config.variant} size="sm" className="font-mono text-[10px]">
