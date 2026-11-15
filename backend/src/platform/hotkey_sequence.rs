@@ -29,6 +29,7 @@ pub struct SequenceDetector {
     timeout: Duration,
     first_key: char,
     second_key: char,
+    suppress_key_up: bool,
 }
 
 impl SequenceDetector {
@@ -38,6 +39,7 @@ impl SequenceDetector {
             timeout: Duration::from_millis(timeout_ms),
             first_key: first_key.to_ascii_uppercase(),
             second_key: second_key.to_ascii_uppercase(),
+            suppress_key_up: false,
         }
     }
 
@@ -112,6 +114,7 @@ impl SequenceDetector {
                     SequenceEventResult::Reset
                 } else if ch == self.second_key {
                     self.state = SequenceState::Triggered;
+                    self.suppress_key_up = true;
                     SequenceEventResult::TriggerSequence
                 } else if ch == self.first_key {
                     // Refreshed V press
@@ -139,6 +142,13 @@ impl SequenceDetector {
                 self.state = SequenceState::CtrlDown;
                 return true;
             }
+        }
+        false
+    pub fn should_suppress_key_up(&mut self, key: char) -> bool {
+        let ch = key.to_ascii_uppercase();
+        if self.suppress_key_up && (ch == self.second_key || ch == self.first_key) {
+            self.suppress_key_up = false;
+            return true;
         }
         false
     }
