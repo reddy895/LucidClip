@@ -164,6 +164,34 @@ impl LinuxKeyGrabber {
     }
 }
 
+/// Managed lifecycle wrapper for the Linux hotkey background thread.
+pub struct LinuxHotkeyThreadHandle {
+    stop_signal: Arc<AtomicBool>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl LinuxHotkeyThreadHandle {
+    pub fn new(stop_signal: Arc<AtomicBool>, handle: std::thread::JoinHandle<()>) -> Self {
+        Self {
+            stop_signal,
+            handle: Some(handle),
+        }
+    }
+
+    pub fn stop(&mut self) {
+        self.stop_signal.store(true, Ordering::SeqCst);
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+    }
+}
+
+impl Drop for LinuxHotkeyThreadHandle {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 pub fn is_supported() -> bool {
     let env = clipboard_environment();
     match env.session {
