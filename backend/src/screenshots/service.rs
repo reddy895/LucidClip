@@ -63,10 +63,23 @@ pub struct ScreenshotGalleryEntry {
 }
 
 /// A validated image payload safe to hand to the webview.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotImageData {
     pub mime_type: String,
     pub data_url: String,
+}
+
+impl ScreenshotImageData {
+    pub fn new(mime_type: impl Into<String>, data_url: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data_url: data_url.into(),
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.mime_type.is_empty() && self.data_url.starts_with("data:")
+    }
 }
 
 impl CaptureMode {
