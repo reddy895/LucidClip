@@ -68,12 +68,61 @@ impl AppPaths {
         Ok(())
     }
 
+    /// Normalize a media path (relative or absolute) to a canonical target under the screenshots directory.
+    pub fn normalize_media_path(&self, path: &Path) -> PathBuf {
+        // Prevent path traversal attempts
+        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            return self.screenshots_dir.join(path);
+        }
+
+        if path.is_relative() {
+            if path.starts_with("originals") || path.starts_with("thumbnails") {
+                return self.screenshots_dir.join(path);
+            }
+            if let Some(file_name) = path.file_name() {
+                let in_orig = self.originals_dir.join(file_name);
+                if in_orig.exists() {
+                    return in_orig;
+                }
+                let in_thumb = self.thumbnails_dir.join(file_name);
+                if in_thumb.exists() {
+                    return in_thumb;
+                }
+            }
+            return self.screenshots_dir.join(path);
+        }
+
+        // If path is absolute and within screenshots_dir, return directly
+        if path.starts_with(&self.screenshots_dir) {
+            return path.to_path_buf();
+        }
+
+        // Fallback for paths saved under a previous app data directory prior to restart/relocation
+        if let Some(file_name) = path.file_name() {
+            let in_orig = self.originals_dir.join(file_name);
+            if in_orig.is_file() {
+                return in_orig;
+            }
+            let in_thumb = self.thumbnails_dir.join(file_name);
+            if in_thumb.is_file() {
+                return in_thumb;
+            }
+        }
+
+        path.to_path_buf()
+    }
+
     /// Whether a stored path is lexically inside the screenshots directory.
     ///
     /// This is a cheap boundary check for paths that may not exist yet (for
     /// example a thumbnail that will be regenerated).
     pub fn owns_media_path(&self, path: &Path) -> bool {
-        path.is_absolute() && path.starts_with(&self.screenshots_dir)
+        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            return false;
+        }
+
+        let normalized = self.normalize_media_path(path);
+        normalized.starts_with(&self.screenshots_dir)
     }
 
     /// Reject paths outside the application's screenshot storage.
