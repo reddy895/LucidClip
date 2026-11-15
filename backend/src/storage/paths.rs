@@ -112,6 +112,18 @@ impl AppPaths {
         path.to_path_buf()
     }
 
+    /// Convert an absolute path within screenshots_dir to a portable relative path.
+    pub fn to_relative_media_path(&self, path: &Path) -> PathBuf {
+        if path.is_relative() {
+            return path.to_path_buf();
+        }
+        if let Ok(rel) = path.strip_prefix(&self.screenshots_dir) {
+            rel.to_path_buf()
+        } else {
+            path.to_path_buf()
+        }
+    }
+
     /// Whether a stored path is lexically inside the screenshots directory.
     ///
     /// This is a cheap boundary check for paths that may not exist yet (for
