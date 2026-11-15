@@ -8,6 +8,28 @@ use crate::platform::hotkeys::ShortcutKey;
 
 pub const LUCIDCLIP_HOTKEY_ID: i32 = 0x4C43; // 'LC' in hex
 
+pub const VK_CONTROL: u32 = 0x11;
+pub const VK_LCONTROL: u32 = 0xA2;
+pub const VK_RCONTROL: u32 = 0xA3;
+pub const VK_V: u32 = 0x56;
+pub const VK_Z: u32 = 0x5A;
+
+/// Check if a given Windows virtual key code is any Ctrl key.
+pub fn is_ctrl_vk(vk: u32) -> bool {
+    vk == VK_CONTROL || vk == VK_LCONTROL || vk == VK_RCONTROL
+}
+
+/// Convert a Windows virtual key code to an uppercase ASCII character if applicable.
+pub fn vk_to_char(vk: u32) -> Option<char> {
+    match vk {
+        VK_V => Some('V'),
+        VK_Z => Some('Z'),
+        0x41..=0x5A => char::from_u32(vk),
+        0x30..=0x39 => char::from_u32(vk),
+        _ => None,
+    }
+}
+
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
