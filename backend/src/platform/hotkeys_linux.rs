@@ -70,6 +70,31 @@ pub fn linux_keysym_to_char(keysym: u32) -> Option<char> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinuxKeyForwardAction {
+    Swallow,
+    ForwardOriginal,
+    TriggerPopup,
+}
+
+/// Determine whether a Linux key event should be swallowed, forwarded via XTest, or trigger the popup.
+pub fn determine_linux_forward_action(
+    detector_result: SequenceEventResult,
+    suppress_key_up: bool,
+) -> LinuxKeyForwardAction {
+    if suppress_key_up {
+        LinuxKeyForwardAction::Swallow
+    } else {
+        match detector_result {
+            SequenceEventResult::TriggerSequence => LinuxKeyForwardAction::TriggerPopup,
+            SequenceEventResult::AwaitingSequence => LinuxKeyForwardAction::ForwardOriginal,
+            SequenceEventResult::PassThrough | SequenceEventResult::Reset => {
+                LinuxKeyForwardAction::ForwardOriginal
+            }
+        }
+    }
+}
+
 /// Structure managing X11 key grabbing state for sequence shortcuts.
 #[derive(Debug, Clone)]
 pub struct LinuxKeyGrabber {
