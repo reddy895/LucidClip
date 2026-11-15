@@ -124,7 +124,7 @@ impl<'a> ClipboardService<'a> {
 
         let new_entry = DbClipboardEntry {
             id: entry_id,
-            content: String::new(),
+            content: format!("[Image: {} × {} px]", stored.width, stored.height),
             content_type: "image".into(),
             source_app,
             created_at: now,
