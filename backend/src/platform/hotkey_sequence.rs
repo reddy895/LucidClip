@@ -56,4 +56,78 @@ impl SequenceDetector {
     pub fn reset(&mut self) {
         self.state = SequenceState::Idle;
     }
+
+    /// Record a Ctrl key-down event.
+    pub fn on_ctrl_down(&mut self) -> SequenceEventResult {
+        match self.state {
+            SequenceState::Idle => {
+                self.state = SequenceState::CtrlDown;
+                SequenceEventResult::PassThrough
+            }
+            _ => SequenceEventResult::PassThrough,
+        }
+    }
+
+    /// Record a Ctrl key-up event. Releases reset any in-progress sequence.
+    pub fn on_ctrl_up(&mut self) -> SequenceEventResult {
+        let was_awaiting = matches!(self.state, SequenceState::AwaitingSecondKey { .. });
+        self.state = SequenceState::Idle;
+        if was_awaiting {
+            SequenceEventResult::Reset
+        } else {
+            SequenceEventResult::PassThrough
+        }
+    }
+
+    /// Process a key-down event for a primary character key while Ctrl is down.
+    pub fn on_key_down(&mut self, key: char) -> SequenceEventResult {
+        let ch = key.to_ascii_uppercase();
+
+        match self.state {
+            SequenceState::CtrlDown => {
+                if ch == self.first_key {
+                    self.state = SequenceState::AwaitingSecondKey {
+                        v_pressed_at: Instant::now(),
+                    };
+                    SequenceEventResult::AwaitingSequence
+                } else {
+                    SequenceEventResult::PassThrough
+                }
+            }
+            SequenceState::AwaitingSecondKey { v_pressed_at } => {
+                if v_pressed_at.elapsed() > self.timeout {
+                    self.state = SequenceState::CtrlDown;
+                    SequenceEventResult::Reset
+                } else if ch == self.second_key {
+                    self.state = SequenceState::Triggered;
+                    SequenceEventResult::TriggerSequence
+                } else if ch == self.first_key {
+                    // Refreshed V press
+                    self.state = SequenceState::AwaitingSecondKey {
+                        v_pressed_at: Instant::now(),
+                    };
+                    SequenceEventResult::AwaitingSequence
+                } else {
+                    self.state = SequenceState::CtrlDown;
+                    SequenceEventResult::Reset
+                }
+            }
+            SequenceState::Triggered => {
+                self.state = SequenceState::CtrlDown;
+                SequenceEventResult::PassThrough
+            }
+            SequenceState::Idle => SequenceEventResult::PassThrough,
+        }
+    }
+
+    /// Check if the awaiting sequence has timed out.
+    pub fn check_timeout(&mut self) -> bool {
+        if let SequenceState::AwaitingSecondKey { v_pressed_at } = self.state {
+            if v_pressed_at.elapsed() > self.timeout {
+                self.state = SequenceState::CtrlDown;
+                return true;
+            }
+        }
+        false
+    }
 }
