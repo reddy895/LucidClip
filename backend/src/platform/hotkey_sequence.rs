@@ -144,6 +144,8 @@ impl SequenceDetector {
             }
         }
         false
+    }
+
     pub fn should_suppress_key_up(&mut self, key: char) -> bool {
         let ch = key.to_ascii_uppercase();
         if self.suppress_key_up && (ch == self.second_key || ch == self.first_key) {

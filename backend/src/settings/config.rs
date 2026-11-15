@@ -90,15 +90,29 @@ pub struct ShortcutsConfig {
     pub quick_access: String,
     pub capture_fullscreen: String,
     pub capture_region: String,
+    #[serde(default = "default_true")]
+    pub sequence_mode: bool,
+    #[serde(default = "default_sequence_timeout")]
+    pub sequence_timeout_ms: u64,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_sequence_timeout() -> u64 {
+    750
 }
 
 impl Default for ShortcutsConfig {
     fn default() -> Self {
         Self {
-            history_popup: "Ctrl+Shift+V".to_string(),
+            history_popup: "Ctrl+V+Z".to_string(),
             quick_access: "Alt+Space".to_string(),
             capture_fullscreen: "PrintScreen".to_string(),
             capture_region: "Ctrl+PrintScreen".to_string(),
+            sequence_mode: true,
+            sequence_timeout_ms: 750,
         }
     }
 }
