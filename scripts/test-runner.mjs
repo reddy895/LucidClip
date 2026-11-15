@@ -25,6 +25,9 @@ import './test/popup-filtering.test.mjs';
 import './test/image-payload-unpacking.test.mjs';
 import './test/popup-image-rendering.test.mjs';
 import './test/popup-paste-action.test.mjs';
+import './test/screenshot-pipeline-regression.test.mjs';
+import './test/screenshot-restart-survival.test.mjs';
+import './test/global-sequence-trigger.test.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
