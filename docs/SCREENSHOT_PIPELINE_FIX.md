@@ -50,8 +50,38 @@ flowchart TD
     G --> H["Frontend Components (PopupHistoryRow, ClipboardRow, TextPreview)"]
 ```
 
-1. **Ingestion Layer:** Detect `CF_DIB`, `CF_DIBV5`, `CF_BITMAP`, registered `"PNG"`, `"image/png"`, and `"image/jpeg"`.
-2. **Storage Layer:** Save PNG originals and 320x180 thumbnails. Support relative paths and automatic thumbnail regeneration.
-3. **Database Layer:** Persist image metadata (`image_width`, `image_height`, `byte_size`, `image_path`, `thumbnail_path`).
-4. **IPC Layer:** Return validated data URL with error handling for corrupted files.
-5. **Frontend Layer:** Safely unpack `.data_url` from response objects and bind thumbnails in both main list and popup rows.
+## 3. Verified Production Contracts
+
+### Rust IPC Model
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScreenshotImageData {
+    pub mime_type: String,
+    pub data_url: String,
+}
+```
+
+### TypeScript Client-Side Unpacking
+```typescript
+export interface ScreenshotImagePayload {
+  mime_type?: string;
+  data_url?: string;
+  mimeType?: string;
+  dataUrl?: string;
+}
+
+export function extractDataUrl(raw: unknown): string {
+  if (typeof raw === 'string') return raw;
+  if (raw && typeof raw === 'object') {
+    const payload = raw as ScreenshotImagePayload;
+    return payload.data_url || payload.dataUrl || '';
+  }
+  return '';
+}
+```
+
+### Restart-Safe Storage Resolution
+- **Canonical Relative Paths:** Media references are saved as basename or relative filenames (`clip_<id>.png`).
+- **Path Resolution:** `AppPaths::resolve_media_file` inspects whether the path is canonical relative, absolute within screenshots directory, or migrates by basename if the app was relocated.
+- **Auto-Regeneration:** If an entry's thumbnail is missing or corrupted, `resolve_image_file` automatically reconstructs a 320x180 PNG thumbnail from the original full-resolution image on disk.
+
