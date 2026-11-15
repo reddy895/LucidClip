@@ -40,6 +40,18 @@ pub enum AppError {
 
     #[error("Focus restoration error: {0}")]
     FocusRestoration(String),
+
+    #[error("Corrupt image file: {0}")]
+    CorruptImage(String),
+
+    #[error("Image decoding failed: {0}")]
+    ImageDecodingFailed(String),
+
+    #[error("Shortcut sequence timeout: {0}")]
+    SequenceTimeout(String),
+
+    #[error("Keyboard hook installation failed: {0}")]
+    HookFailed(String),
 }
 
 impl From<rusqlite::Error> for AppError {
