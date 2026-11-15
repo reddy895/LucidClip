@@ -381,6 +381,21 @@ mod windows_clipboard {
             }
         }
 
+        // Support registered memory-backed PNG and JPEG formats commonly placed by browsers and design tools
+        let registered_image_names = ["PNG", "image/png", "image/jpeg", "JFIF"];
+        for name in registered_image_names {
+            let fmt = register_format(name);
+            if fmt != 0 && unsafe { IsClipboardFormatAvailable(fmt) } != 0 {
+                match read_registered_image(fmt) {
+                    Ok(Some(image)) => return Ok(Some(ClipboardSnapshot::Image(image))),
+                    Ok(None) => {}
+                    Err(err) => {
+                        eprintln!("[LucidClip Clipboard] Could not read registered image '{name}': {err}");
+                    }
+                }
+            }
+        }
+
         if unsafe { IsClipboardFormatAvailable(CF_BITMAP) } != 0 {
             match read_bitmap_handle() {
                 Ok(Some(image)) => return Ok(Some(ClipboardSnapshot::Image(image))),
@@ -698,6 +713,48 @@ mod windows_clipboard {
             GlobalUnlock(handle);
         }
         result.map(Some)
+    }
+
+    fn read_registered_image(format: u32) -> Result<Option<CapturedImage>> {
+        let handle = unsafe { GetClipboardData(format) };
+        if handle.is_null() {
+            return Ok(None);
+        }
+
+        let source = unsafe { GlobalLock(handle) } as *const u8;
+        if source.is_null() {
+            return Err(AppError::Clipboard(
+                "Failed to lock the Windows clipboard registered image".into(),
+            ));
+        }
+
+        let byte_len = unsafe { GlobalSize(handle) } as usize;
+        let data = unsafe { std::slice::from_raw_parts(source, byte_len) };
+
+        let dynamic = match image::load_from_memory(data) {
+            Ok(img) => img,
+            Err(_) => {
+                unsafe {
+                    GlobalUnlock(handle);
+                }
+                return Ok(None);
+            }
+        };
+
+        unsafe {
+            GlobalUnlock(handle);
+        }
+
+        let rgba_img = dynamic.to_rgba8();
+        let width = rgba_img.width();
+        let height = rgba_img.height();
+        let rgba = rgba_img.into_raw();
+
+        Ok(Some(CapturedImage {
+            width,
+            height,
+            rgba,
+        }))
     }
 }
 
