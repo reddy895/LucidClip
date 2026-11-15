@@ -108,7 +108,12 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: usize, lpar
                     let res = ctx.detector.on_key_down(ch);
                     if res == SequenceEventResult::TriggerSequence {
                         (ctx.on_triggered)();
+                        // Swallow the trigger key so it doesn't cause an undo (Ctrl+Z) in the focused app
+                        return 1;
                     }
+                } else if is_keyup && ctx.detector.should_suppress_key_up(ch) {
+                    // Swallow the keyup of the sequence key to avoid ghost key events
+                    return 1;
                 }
             }
         }
