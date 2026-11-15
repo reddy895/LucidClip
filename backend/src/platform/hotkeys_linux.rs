@@ -7,6 +7,44 @@ use std::sync::Arc;
 use crate::errors::{AppError, Result};
 use crate::platform::environment::{clipboard_environment, ClipboardSession};
 use crate::platform::hotkeys::ShortcutKey;
+use crate::platform::hotkey_sequence::{SequenceDetector, SequenceEventResult};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinuxKeyEventType {
+    KeyPress,
+    KeyRelease,
+}
+
+/// Feed a raw Linux X11 keysym event into the sequence detector state machine.
+pub fn process_linux_key_event(
+    detector: &mut SequenceDetector,
+    event_type: LinuxKeyEventType,
+    keysym: u32,
+) -> SequenceEventResult {
+    if is_linux_ctrl_keysym(keysym) {
+        match event_type {
+            LinuxKeyEventType::KeyPress => detector.on_ctrl_down(),
+            LinuxKeyEventType::KeyRelease => detector.on_ctrl_up(),
+        }
+    } else if let Some(ch) = linux_keysym_to_char(keysym) {
+        match event_type {
+            LinuxKeyEventType::KeyPress => {
+                detector.check_timeout();
+                detector.on_key_down(ch)
+            }
+            LinuxKeyEventType::KeyRelease => {
+                if detector.should_suppress_key_up(ch) {
+                    SequenceEventResult::Reset
+                } else {
+                    SequenceEventResult::PassThrough
+                }
+            }
+        }
+    } else {
+        SequenceEventResult::PassThrough
+    }
+}
+
 
 pub const XK_CONTROL_L: u32 = 0xFFE3;
 pub const XK_CONTROL_R: u32 = 0xFFE4;
