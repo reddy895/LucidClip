@@ -291,7 +291,11 @@ impl<'a> ScreenshotService<'a> {
         self.paths.validate_media_path(candidate)?;
 
         if let Ok(existing) = self.paths.resolve_media_file(candidate) {
-            return Ok(existing);
+            if let Ok(meta) = fs::metadata(&existing) {
+                if meta.len() > 0 {
+                    return Ok(existing);
+                }
+            }
         }
 
         let original = self
@@ -299,8 +303,9 @@ impl<'a> ScreenshotService<'a> {
             .resolve_media_file(Path::new(&entry.original_path))?;
         let source = image::open(&original)?;
         let thumbnail = source.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+        let target_path = self.paths.normalize_media_path(candidate);
 
-        if let Some(parent) = candidate.parent() {
+        if let Some(parent) = target_path.parent() {
             fs::create_dir_all(parent).map_err(|err| {
                 AppError::Storage(format!(
                     "Failed to create thumbnail directory {}: {err}",
@@ -309,8 +314,8 @@ impl<'a> ScreenshotService<'a> {
             })?;
         }
 
-        thumbnail.save_with_format(candidate, ImageFormat::Png)?;
-        self.paths.resolve_media_file(candidate)
+        thumbnail.save_with_format(&target_path, ImageFormat::Png)?;
+        self.paths.resolve_media_file(&target_path)
     }
 
     pub fn get(&self, id: &str) -> Result<Option<DbScreenshotEntry>> {

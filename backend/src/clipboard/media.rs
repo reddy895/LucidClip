@@ -92,7 +92,11 @@ pub fn resolve_image_file(
     paths.validate_media_path(candidate)?;
 
     if let Ok(existing) = paths.resolve_media_file(candidate) {
-        return Ok(existing);
+        if let Ok(meta) = fs::metadata(&existing) {
+            if meta.len() > 0 {
+                return Ok(existing);
+            }
+        }
     }
 
     if !thumbnail {
@@ -106,8 +110,9 @@ pub fn resolve_image_file(
     let original = paths.resolve_media_file(Path::new(original))?;
     let source = image::open(&original)?;
     let generated = source.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+    let target_path = paths.normalize_media_path(candidate);
 
-    if let Some(parent) = candidate.parent() {
+    if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent).map_err(|err| {
             AppError::Storage(format!(
                 "Failed to create clipboard thumbnail directory {}: {err}",
@@ -116,8 +121,8 @@ pub fn resolve_image_file(
         })?;
     }
 
-    generated.save_with_format(candidate, ImageFormat::Png)?;
-    paths.resolve_media_file(candidate)
+    generated.save_with_format(&target_path, ImageFormat::Png)?;
+    paths.resolve_media_file(&target_path)
 }
 
 /// Remove media files owned by a clipboard entry.
