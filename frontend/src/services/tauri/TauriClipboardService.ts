@@ -8,6 +8,7 @@ import {
   ClipboardEntry,
   ClipboardMonitorStatus,
   ImageVariant,
+  unpackImageDataUrl,
 } from '@/types';
 
 export interface DbClipboardDto {
@@ -82,10 +83,12 @@ export class TauriClipboardService implements IClipboardService {
     const cached = imageCache.get(key);
     if (cached) return cached;
 
-    const request = invoke<string>('get_clipboard_image', { id, variant }).catch((err) => {
-      imageCache.delete(key);
-      throw err;
-    });
+    const request = invoke<string | { data_url?: string; dataUrl?: string; mime_type?: string }>('get_clipboard_image', { id, variant })
+      .then((res) => unpackImageDataUrl(res))
+      .catch((err) => {
+        imageCache.delete(key);
+        throw err;
+      });
     imageCache.set(key, request);
     return request;
   }
