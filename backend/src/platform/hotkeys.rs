@@ -220,9 +220,11 @@ pub fn probe_shortcut_availability(raw: &str) -> Result<ShortcutKey> {
 
     #[cfg(target_os = "windows")]
     {
-        const PROBE_ID: i32 = 0x4C44;
-        crate::platform::hotkeys_windows::register_hotkey(PROBE_ID, &key)?;
-        let _ = crate::platform::hotkeys_windows::unregister_hotkey(PROBE_ID);
+        if !key.is_sequence() {
+            const PROBE_ID: i32 = 0x4C44;
+            crate::platform::hotkeys_windows::register_hotkey(PROBE_ID, &key)?;
+            let _ = crate::platform::hotkeys_windows::unregister_hotkey(PROBE_ID);
+        }
     }
 
     Ok(key)
