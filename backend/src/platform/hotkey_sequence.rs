@@ -53,6 +53,18 @@ impl SequenceDetector {
         self.timeout
     }
 
+    pub fn first_key(&self) -> char {
+        self.first_key
+    }
+
+    pub fn second_key(&self) -> char {
+        self.second_key
+    }
+
+    pub fn is_awaiting(&self) -> bool {
+        matches!(self.state, SequenceState::AwaitingSecondKey { .. })
+    }
+
     pub fn reset(&mut self) {
         self.state = SequenceState::Idle;
     }
