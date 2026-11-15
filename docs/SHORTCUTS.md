@@ -90,12 +90,15 @@ When operating within the primary LucidClip desktop application window, the foll
 ## 4. Platform Implementation Details
 
 ### Windows (`winuser.h`)
-- Global shortcuts are registered using the Win32 `RegisterHotKey` API on a dedicated background message pump thread (`HWND`).
-- Active window handles (`HWND`) are captured via `GetForegroundWindow` before displaying the popup.
-- Focus restoration attaches the calling thread input queue (`AttachThreadInput`) and invokes `SetForegroundWindow` prior to paste injection.
-- Synthetic paste dispatches `SendInput` events with `VK_CONTROL` and `'V'`.
+- **Low-Level Keyboard Hook (`WH_KEYBOARD_LL`):** Installed via `SetWindowsHookExW` on a dedicated background message pump thread. Intercepts `VK_CONTROL`, `VK_V`, and `VK_Z` to drive the `SequenceDetector` state machine.
+- **Accidental Paste & Undo Suppression:** When the `Ctrl+V+Z` sequence is completed, the trigger keydown and subsequent keyup events are swallowed (returning `1` from the hook procedure) so the focused application never receives an undo (`Ctrl+Z`).
+- **Normal Keystroke Pass-Through:** If the sequence is not completed or times out (>750ms), keys pass directly to `CallNextHookEx`, ensuring normal `Ctrl+V` (paste) and `Ctrl+Z` (undo) operate unimpeded.
+- **Active Window Capture:** Target window handles (`HWND`) are captured via `GetForegroundWindow` before displaying the popup.
+- **Focus Restoration & Synthetic Paste:** Prior to paste injection, focus is returned via `SetForegroundWindow` and `AttachThreadInput`, followed by synthetic `SendInput` keystrokes.
+- **Chord Fallback:** For systems preferring chords, `RegisterHotKey` supports `Ctrl+Shift+V`.
 
 ### Linux (X11 & Wayland)
-- On X11, global hotkeys utilize `XGrabKey` with passive key grabs on the root window. Active windows are resolved via `_NET_ACTIVE_WINDOW`.
-- Synthetic paste on X11 uses the `XTest` extension (`XTestFakeKeyEvent`) or `xdotool` fallback.
+- **X11 Session:** Global key sequence listening uses passive grabs on root window keycodes for Control, V, and Z. Active windows are resolved via EWMH `_NET_ACTIVE_WINDOW`. Synthetic paste uses `XTestFakeKeyEvent`.
+- **Wayland Session:** Under Wayland, compositors intentionally restrict background key interception for security. LucidClip surfaces clear diagnostics advising users to map a desktop environment shortcut (GNOME / KDE) to `lucidclip --popup`.
+- **Paste Guard Protection:** LucidClip's `PasteGuard` computes SHA-256 hashes of injected text and images to prevent loop-recording self-generated clipboard updates.
 - On Wayland environments, shortcuts adhere to the `org.freedesktop.portal.GlobalShortcuts` portal protocol; paste execution operates via standard clipboard synchronization with graceful notification when direct synthetic input injection is restricted by the Wayland compositor security boundary.
