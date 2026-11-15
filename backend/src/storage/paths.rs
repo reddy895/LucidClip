@@ -140,6 +140,7 @@ impl AppPaths {
     /// screenshot directory through a symlink.
     pub fn resolve_media_file(&self, path: &Path) -> Result<PathBuf> {
         self.validate_media_path(path)?;
+        let normalized = self.normalize_media_path(path);
 
         let canonical_root = fs::canonicalize(&self.screenshots_dir).map_err(|err| {
             AppError::Storage(format!(
@@ -148,28 +149,28 @@ impl AppPaths {
             ))
         })?;
 
-        let canonical = fs::canonicalize(path).map_err(|err| match err.kind() {
+        let canonical = fs::canonicalize(&normalized).map_err(|err| match err.kind() {
             std::io::ErrorKind::NotFound => AppError::NotFound(format!(
                 "Media file is missing: {}",
-                path.display()
+                normalized.display()
             )),
             _ => AppError::Storage(format!(
                 "Failed to resolve media file {}: {err}",
-                path.display()
+                normalized.display()
             )),
         })?;
 
         if !canonical.starts_with(&canonical_root) {
             return Err(AppError::InvalidInput(format!(
                 "Refusing to follow media outside the application data directory: {}",
-                path.display()
+                normalized.display()
             )));
         }
 
         if !canonical.is_file() {
             return Err(AppError::NotFound(format!(
                 "Media file is missing: {}",
-                path.display()
+                normalized.display()
             )));
         }
 
