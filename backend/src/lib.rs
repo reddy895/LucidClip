@@ -18,9 +18,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, WindowEvent};
-#[cfg(target_os = "windows")]
-use tauri::Emitter;
+use tauri::{Emitter, Manager, WindowEvent};
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "lucidclip-tray";
@@ -252,6 +250,42 @@ pub fn run() {
                         },
                     );
                     hotkeys.state.set_active(crate::platform::DEFAULT_HISTORY_SHORTCUT, true, None);
+                }
+            }
+
+            #[cfg(target_os = "linux")]
+            {
+                if let Ok(key) = crate::platform::ShortcutKey::parse(crate::platform::DEFAULT_HISTORY_SHORTCUT) {
+                    let app_handle = app.handle().clone();
+                    let state_for_hotkey = state.clone();
+                    let hotkeys_clone = hotkeys.clone();
+                    let res = crate::platform::hotkeys_linux::spawn_linux_hotkey_listener(
+                        key,
+                        hotkeys_clone.listener_stop.clone(),
+                        move || {
+                            let target = crate::platform::capture_foreground_target().unwrap_or(None);
+                            state_for_hotkey.focus_manager.set_target(target);
+                            let _ = crate::platform::show_popup_window(&app_handle);
+                            let _ = app_handle.emit(
+                                "clipboard://global-shortcut-triggered",
+                                serde_json::json!({
+                                    "shortcut": crate::platform::DEFAULT_HISTORY_SHORTCUT,
+                                }),
+                            );
+                        },
+                    );
+                    match res {
+                        Ok(()) => {
+                            hotkeys.state.set_active(crate::platform::DEFAULT_HISTORY_SHORTCUT, true, None);
+                        }
+                        Err(e) => {
+                            hotkeys.state.set_active(
+                                crate::platform::DEFAULT_HISTORY_SHORTCUT,
+                                false,
+                                Some(e.to_string()),
+                            );
+                        }
+                    }
                 }
             }
 
