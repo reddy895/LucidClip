@@ -33,6 +33,26 @@ pub fn hash_image(image: &CapturedImage) -> String {
 }
 
 pub fn store(paths: &AppPaths, id: &str, image: &CapturedImage) -> Result<StoredImage> {
+    if image.width == 0 || image.height == 0 || image.width > 32_768 || image.height > 32_768 {
+        return Err(AppError::InvalidInput(format!(
+            "Captured image dimensions {}x{} are invalid or exceed 32k bounds",
+            image.width, image.height
+        )));
+    }
+
+    let expected_len = (image.width as usize)
+        .checked_mul(image.height as usize)
+        .and_then(|px| px.checked_mul(4))
+        .ok_or_else(|| AppError::InvalidInput("Image pixel buffer dimensions overflow".into()))?;
+
+    if image.rgba.len() != expected_len {
+        return Err(AppError::Clipboard(format!(
+            "Captured image buffer length {} does not match expected length {}",
+            image.rgba.len(),
+            expected_len
+        )));
+    }
+
     let rgba =
         RgbaImage::from_raw(image.width, image.height, image.rgba.clone()).ok_or_else(|| {
             AppError::Clipboard("Captured image buffer does not match its dimensions".into())
