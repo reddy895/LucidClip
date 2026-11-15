@@ -56,21 +56,13 @@ pub fn copy_clipboard_entry_by_id(id: String, state: tauri::State<'_, AppState>)
 
     match entry.content_type.as_str() {
         "image" => {
-            let path = entry.image_path.as_deref().ok_or_else(|| {
+            let path_str = entry.image_path.as_deref().ok_or_else(|| {
                 AppError::Clipboard(format!("Clipboard image {id} has no stored file"))
             })?;
-            let path = std::path::Path::new(path);
-            if !path.starts_with(&state.paths.screenshots_dir) {
-                return Err(AppError::InvalidInput(
-                    "Clipboard image path is outside the application data directory".into(),
-                ));
-            }
-            if !path.is_file() {
-                return Err(AppError::NotFound(format!(
-                    "Clipboard image file for {id} is missing"
-                )));
-            }
-            let image = image::open(path)?.to_rgba8();
+            let path = state
+                .paths
+                .resolve_media_file(std::path::Path::new(path_str))?;
+            let image = image::open(&path)?.to_rgba8();
             crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
         }
         "files" => {
@@ -547,21 +539,23 @@ pub fn execute_instant_paste(
     state: tauri::State<'_, AppState>,
     entry_id: String,
     content: String,
-    _content_type: String,
+    content_type: String,
 ) -> Result<crate::platform::PasteExecutionResult> {
     let target = state.focus_manager.get_target();
 
     // 1. Hide popup window first
     let _ = crate::platform::hide_popup_window(&app);
 
-    // 2. Mark hash in paste guard to prevent monitor re-capture
-    let hash = crate::clipboard::hash_content(&content);
-    state.paste_guard.mark_internal(&hash);
+    // 2. Put content onto system clipboard & mark paste guard
+    if content_type == "image" {
+        let _ = copy_clipboard_entry_by_id(entry_id.clone(), state.clone());
+    } else {
+        let hash = crate::clipboard::hash_content(&content);
+        state.paste_guard.mark_internal(&hash);
+        crate::platform::set_clipboard_text(&content)?;
+    }
 
-    // 3. Put content onto system clipboard
-    crate::platform::set_clipboard_text(&content)?;
-
-    // 4. Update usage touch on entry in DB
+    // 3. Update usage touch on entry in DB
     let _ = crate::database::ClipboardRepo::new(&state.pool).touch(&entry_id);
 
     // 5. If target active window was preserved, restore focus
