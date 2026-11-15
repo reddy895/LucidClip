@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     captureImages: true,
     excludedApps: ['1Password.exe', 'KeePass.exe', 'Bitwarden.exe', 'KeePassXC.exe'],
     instantPasteEnabled: true,
+    pasteOnSelect: true,
   },
   screenshots: {
     saveDirectory: '',
@@ -30,10 +31,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     thumbnailQuality: 'high',
   },
   shortcuts: {
-    historyPopup: 'Ctrl+Shift+V',
+    historyPopup: 'Ctrl+V+Z',
     quickAccess: 'Alt+Space',
     captureFullscreen: 'PrintScreen',
     captureRegion: 'Ctrl+Shift+S',
+    sequenceMode: true,
+    sequenceTimeoutMs: 750,
   },
   privacy: {
     pauseMonitoring: false,

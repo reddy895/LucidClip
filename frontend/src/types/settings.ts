@@ -14,6 +14,7 @@ export interface ClipboardSettings {
   captureImages: boolean;
   excludedApps: string[];
   instantPasteEnabled: boolean;
+  pasteOnSelect?: boolean;
 }
 
 export interface ScreenshotSettings {
@@ -29,6 +30,8 @@ export interface ShortcutSettings {
   captureFullscreen: string;
   captureRegion: string;
   historyPopup: string;
+  sequenceMode?: boolean;
+  sequenceTimeoutMs?: number;
 }
 
 export interface PrivacySettings {
