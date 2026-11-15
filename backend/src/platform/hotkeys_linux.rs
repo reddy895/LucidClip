@@ -3,6 +3,41 @@
 //! Provides X11 key grabbing and honest Wayland compositor policy diagnostics.
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LinuxHotkeyDiagnostics {
+    pub session: String,
+    pub global_interception_supported: bool,
+    pub reason: String,
+    pub suggested_action: Option<String>,
+}
+
+/// Provide clear, honest diagnostics regarding Linux session display server capabilities.
+pub fn get_linux_hotkey_diagnostics() -> LinuxHotkeyDiagnostics {
+    let env = clipboard_environment();
+    match env.session {
+        ClipboardSession::X11 => LinuxHotkeyDiagnostics {
+            session: "X11".to_string(),
+            global_interception_supported: true,
+            reason: "X11 allows global key interception via root window grab.".to_string(),
+            suggested_action: None,
+        },
+        ClipboardSession::Wayland => LinuxHotkeyDiagnostics {
+            session: "Wayland".to_string(),
+            global_interception_supported: false,
+            reason: "Wayland compositor security model restricts global key event interception from background applications.".to_string(),
+            suggested_action: Some("Configure a custom global shortcut in your desktop environment settings (GNOME/KDE) pointing to 'lucidclip --popup'.".to_string()),
+        },
+        ClipboardSession::Unsupported => LinuxHotkeyDiagnostics {
+            session: "Unknown".to_string(),
+            global_interception_supported: false,
+            reason: "No active display server detected.".to_string(),
+            suggested_action: None,
+        },
+    }
+}
+
 
 static LAST_LINUX_ACTIVE_WINDOW: AtomicIsize = AtomicIsize::new(0);
 
