@@ -211,6 +211,7 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
       <PopupFooter
         unpinnedCount={counts.all - counts.pinned}
         onClearUnpinned={clearClipboardHistory}
+        pasteOnSelect={pasteOnSelect}
       />
     </div>
   );

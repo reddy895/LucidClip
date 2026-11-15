@@ -4,11 +4,13 @@ import { Trash2 } from 'lucide-react';
 export interface PopupFooterProps {
   unpinnedCount: number;
   onClearUnpinned: () => void;
+  pasteOnSelect?: boolean;
 }
 
 export const PopupFooter: React.FC<PopupFooterProps> = ({
   unpinnedCount,
   onClearUnpinned,
+  pasteOnSelect = true,
 }) => {
   return (
     <div
@@ -21,7 +23,14 @@ export const PopupFooter: React.FC<PopupFooterProps> = ({
           <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">
             ↵
           </kbd>
-          <span>Paste</span>
+          <span>{pasteOnSelect ? 'Paste' : 'Select'}</span>
+        </span>
+
+        <span className="flex items-center gap-1">
+          <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">
+            ⇧↵
+          </kbd>
+          <span>Copy only</span>
         </span>
 
         <span className="flex items-center gap-1">
