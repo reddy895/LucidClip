@@ -123,13 +123,16 @@ export const PopupHistoryRow = React.memo<PopupHistoryRowProps>(({
                   alt="Clipboard media thumbnail"
                   className="w-12 h-8 object-cover rounded border border-[#30363D] bg-black/40"
                   loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
                 />
               ) : clipboardImage.state === 'loading' ? (
                 <div className="w-12 h-8 rounded border border-[#30363D] bg-[#151719] flex items-center justify-center animate-pulse">
                   <ImageIcon className="w-3.5 h-3.5 text-[#6B7280]" />
                 </div>
               ) : (
-                <div className="w-12 h-8 rounded border border-[#30363D] bg-[#151719] flex items-center justify-center">
+                <div className="w-12 h-8 rounded border border-[#30363D] bg-[#151719] flex items-center justify-center" title="Image preview unavailable">
                   <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
                 </div>
               )}
