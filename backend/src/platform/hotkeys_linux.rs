@@ -8,6 +8,44 @@ use crate::errors::{AppError, Result};
 use crate::platform::environment::{clipboard_environment, ClipboardSession};
 use crate::platform::hotkeys::ShortcutKey;
 
+pub const XK_CONTROL_L: u32 = 0xFFE3;
+pub const XK_CONTROL_R: u32 = 0xFFE4;
+pub const XK_V_LOWER: u32 = 0x0076;
+pub const XK_V_UPPER: u32 = 0x0056;
+pub const XK_Z_LOWER: u32 = 0x007A;
+pub const XK_Z_UPPER: u32 = 0x005A;
+
+/// Check if a Linux keysym represents a Control key.
+pub fn is_linux_ctrl_keysym(keysym: u32) -> bool {
+    keysym == XK_CONTROL_L || keysym == XK_CONTROL_R
+}
+
+/// Convert a Linux keysym to an uppercase char if it corresponds to an alphanumeric key.
+pub fn linux_keysym_to_char(keysym: u32) -> Option<char> {
+    match keysym {
+        XK_V_LOWER | XK_V_UPPER => Some('V'),
+        XK_Z_LOWER | XK_Z_UPPER => Some('Z'),
+        0x0041..=0x005A => char::from_u32(keysym),
+        0x0061..=0x007A => char::from_u32(keysym - 0x20),
+        0x0030..=0x0039 => char::from_u32(keysym),
+        _ => None,
+    }
+}
+
+/// Structure managing X11 key grabbing state for sequence shortcuts.
+#[derive(Debug, Clone)]
+pub struct LinuxKeyGrabber {
+    pub key: ShortcutKey,
+    pub is_sequence: bool,
+}
+
+impl LinuxKeyGrabber {
+    pub fn new(key: ShortcutKey) -> Self {
+        let is_sequence = key.is_sequence();
+        Self { key, is_sequence }
+    }
+}
+
 pub fn is_supported() -> bool {
     let env = clipboard_environment();
     match env.session {
