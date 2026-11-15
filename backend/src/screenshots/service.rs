@@ -371,7 +371,7 @@ impl<'a> ScreenshotService<'a> {
     }
 }
 
-pub(crate) fn image_data_url(path: &Path) -> Result<ScreenshotImageData> {
+pub fn image_data_url(path: &Path) -> Result<ScreenshotImageData> {
     let bytes = fs::read(path).map_err(|err| {
         AppError::Storage(format!(
             "Failed to read screenshot image {}: {err}",
