@@ -748,6 +748,11 @@ mod windows_clipboard {
         let rgba_img = dynamic.to_rgba8();
         let width = rgba_img.width();
         let height = rgba_img.height();
+
+        if width == 0 || height == 0 || (width as u64 * height as u64) > super::MAX_IMAGE_PIXELS {
+            return Ok(None);
+        }
+
         let rgba = rgba_img.into_raw();
 
         Ok(Some(CapturedImage {
