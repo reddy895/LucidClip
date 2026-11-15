@@ -61,6 +61,31 @@ export interface ClipboardDiagnostics {
   diagnostics: string[];
 }
 
+/**
+ * Structured image payload returned by `get_clipboard_image` and `get_screenshot_image`.
+ */
+export interface ScreenshotImagePayload {
+  mime_type?: string;
+  data_url?: string;
+  mimeType?: string;
+  dataUrl?: string;
+}
+
+/**
+ * Safely extracts a data URL string from either a direct string response
+ * or a serialized `ScreenshotImagePayload` object.
+ */
+export function unpackImageDataUrl(
+  response: string | ScreenshotImagePayload | null | undefined
+): string {
+  if (!response) return '';
+  if (typeof response === 'string') return response;
+  if (typeof response === 'object') {
+    return response.data_url || response.dataUrl || '';
+  }
+  return '';
+}
+
 /** Live monitor lifecycle reported by `get_monitor_status`. */
 export interface ClipboardMonitorStatus {
   supported: boolean;
