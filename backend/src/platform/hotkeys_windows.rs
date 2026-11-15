@@ -225,9 +225,40 @@ where
     thread::Builder::new()
         .name("lucidclip-windows-hotkeys".into())
         .spawn(move || {
-            let reg_res = register_hotkey(LUCIDCLIP_HOTKEY_ID, &key);
-            let success = reg_res.is_ok();
-            let _ = ready_tx.send(reg_res);
+            let is_seq = key.is_sequence();
+            let init_res: Result<()> = if is_seq {
+                let hook = unsafe {
+                    SetWindowsHookExW(
+                        WH_KEYBOARD_LL,
+                        Some(low_level_keyboard_proc),
+                        std::ptr::null_mut(),
+                        0,
+                    )
+                };
+                if hook.is_null() {
+                    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                    Err(AppError::GlobalShortcut(format!(
+                        "Failed to install WH_KEYBOARD_LL hook: Error {err}"
+                    )))
+                } else {
+                    let first_ch = key.sequence_keys.first().and_then(|k| k.chars().next()).unwrap_or('V');
+                    let second_ch = key.sequence_keys.get(1).and_then(|k| k.chars().next()).unwrap_or('Z');
+                    let detector = SequenceDetector::new(first_ch, second_ch, 750);
+                    if let Ok(mut guard) = WINDOWS_HOOK_CONTEXT.lock() {
+                        *guard = Some(WindowsHookContext {
+                            detector,
+                            on_triggered: Box::new(on_triggered),
+                            hook,
+                        });
+                    }
+                    Ok(())
+                }
+            } else {
+                register_hotkey(LUCIDCLIP_HOTKEY_ID, &key)
+            };
+
+            let success = init_res.is_ok();
+            let _ = ready_tx.send(init_res);
 
             if !success {
                 return;
@@ -240,8 +271,12 @@ where
                     break;
                 }
 
-                if msg.message == WM_HOTKEY && msg.wParam == LUCIDCLIP_HOTKEY_ID as usize {
-                    on_triggered();
+                if !is_seq && msg.message == WM_HOTKEY && msg.wParam == LUCIDCLIP_HOTKEY_ID as usize {
+                    if let Ok(guard) = WINDOWS_HOOK_CONTEXT.lock() {
+                        if let Some(ctx) = guard.as_ref() {
+                            (ctx.on_triggered)();
+                        }
+                    }
                 }
 
                 unsafe {
@@ -249,7 +284,20 @@ where
                 }
             }
 
-            let _ = unregister_hotkey(LUCIDCLIP_HOTKEY_ID);
+            // Clean teardown on thread exit
+            if is_seq {
+                if let Ok(mut guard) = WINDOWS_HOOK_CONTEXT.lock() {
+                    if let Some(ctx) = guard.take() {
+                        if !ctx.hook.is_null() {
+                            unsafe {
+                                UnhookWindowsHookEx(ctx.hook);
+                            }
+                        }
+                    }
+                }
+            } else {
+                let _ = unregister_hotkey(LUCIDCLIP_HOTKEY_ID);
+            }
         })
         .map_err(|e| AppError::System(format!("Failed to spawn Windows hotkey thread: {e}")))?;
 
