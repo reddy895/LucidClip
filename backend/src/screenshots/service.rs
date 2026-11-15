@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::Utc;
 use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::database::{DbPool, DbScreenshotEntry, ScreenshotRepo};
 use crate::errors::{AppError, Result};
