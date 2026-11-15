@@ -5,6 +5,10 @@
 #[cfg_attr(not(target_os = "windows"), allow(unused_imports))]
 use crate::errors::{AppError, Result};
 use crate::platform::hotkeys::ShortcutKey;
+#[cfg(target_os = "windows")]
+use std::sync::Mutex;
+#[cfg(target_os = "windows")]
+use crate::platform::hotkey_sequence::{SequenceDetector, SequenceEventResult};
 
 pub const LUCIDCLIP_HOTKEY_ID: i32 = 0x4C43; // 'LC' in hex
 
@@ -68,6 +72,49 @@ impl Drop for WindowsLowLevelHook {
             }
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsHookContext {
+    detector: SequenceDetector,
+    on_triggered: Box<dyn Fn() + Send + 'static>,
+    hook: HHOOK,
+}
+
+#[cfg(target_os = "windows")]
+static WINDOWS_HOOK_CONTEXT: Mutex<Option<WindowsHookContext>> = Mutex::new(None);
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: usize, lparam: isize) -> isize {
+    if code < 0 {
+        return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
+    }
+
+    let kbd = *(lparam as *const KBDLLHOOKSTRUCT);
+    let vk = kbd.vkCode;
+    let is_keydown = wparam as u32 == WM_KEYDOWN || wparam as u32 == WM_SYSKEYDOWN;
+    let is_keyup = wparam as u32 == WM_KEYUP || wparam as u32 == WM_SYSKEYUP;
+
+    if let Ok(mut guard) = WINDOWS_HOOK_CONTEXT.lock() {
+        if let Some(ctx) = guard.as_mut() {
+            if is_ctrl_vk(vk) {
+                if is_keydown {
+                    ctx.detector.on_ctrl_down();
+                } else if is_keyup {
+                    ctx.detector.on_ctrl_up();
+                }
+            } else if let Some(ch) = vk_to_char(vk) {
+                if is_keydown {
+                    let res = ctx.detector.on_key_down(ch);
+                    if res == SequenceEventResult::TriggerSequence {
+                        (ctx.on_triggered)();
+                    }
+                }
+            }
+        }
+    }
+
+    CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
 }
 
 #[cfg(target_os = "windows")]
