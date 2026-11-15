@@ -486,15 +486,30 @@ export const SettingsView: React.FC = () => {
                 <div className="flex items-center justify-between py-1">
                   <div>
                     <div className="text-xs font-medium text-graphite-text-primary">
-                      Floating Clipboard Popup
+                      Floating Clipboard Popup Shortcut
                     </div>
                     <div className="text-[11px] text-graphite-text-muted">
-                      Toggle the frameless instant clipboard history window.
+                      Select your preferred global trigger method.
                     </div>
                   </div>
-                  <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-[#8B9CF7] border border-[#8B9CF7]/40 shadow-sm font-semibold">
-                    {settings.shortcuts.historyPopup || 'Ctrl+V+Z'}
-                  </kbd>
+                  <Select
+                    value={settings.shortcuts.historyPopup === 'Ctrl+Shift+V' ? 'Ctrl+Shift+V' : 'Ctrl+V+Z'}
+                    onChange={(val) =>
+                      updateSettings({
+                        shortcuts: { ...settings.shortcuts, historyPopup: val },
+                      })
+                    }
+                    options={[
+                      { value: 'Ctrl+V+Z', label: 'Ctrl+V+Z (Sequential)' },
+                      { value: 'Ctrl+Shift+V', label: 'Ctrl+Shift+V (Chord)' },
+                    ]}
+                    className="w-48"
+                  />
+                </div>
+
+                <div className="rounded-btn border border-[#8B9CF7]/30 bg-[#8B9CF7]/10 p-3 text-[11px] text-[#A1A7B0] leading-relaxed">
+                  <div className="font-medium text-[#F3F4F6] mb-1">About Ctrl+V+Z Sequence:</div>
+                  Hold <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">Ctrl</kbd>, press <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">V</kbd>, then press <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">Z</kbd> within 750ms while keeping Ctrl held. Normal <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">Ctrl+V</kbd> paste and <kbd className="px-1 py-0.5 rounded bg-[#22262B] text-[#F3F4F6] text-[10px] font-mono border border-[#30363D]">Ctrl+Z</kbd> undo continue working seamlessly when the sequence is not completed.
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-t border-graphite-border/40 pt-2">
