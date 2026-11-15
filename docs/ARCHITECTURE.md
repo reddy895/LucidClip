@@ -230,7 +230,9 @@ Responsible for:
 - Database operations.
 - Search operations.
 - System tray management.
-- Global keyboard shortcuts.
+- Global keyboard shortcuts and multi-key sequence detection (`WH_KEYBOARD_LL` hook and `SequenceDetector`).
+- Portable relative media storage resolution and thumbnail regeneration.
+- Safe paste injection and loop-recording prevention (`PasteGuard`).
 - Application settings.
 - Windows integrations.
 

@@ -45,11 +45,15 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 
 ### System-wide clipboard intelligence & instant paste
 
-- Global hotkey listener (`Ctrl+Shift+V` configurable) across Windows (`RegisterHotKey` message loop) and Linux (X11 `XGrabKey` and Wayland portal diagnostics).
-- Dedicated frameless, always-on-top floating clipboard popup window with full keyboard navigation (`ArrowUp`/`ArrowDown`, `Enter` to paste, `Esc` to close, `Home`/`End`, `Alt+1`..`Alt+9`, `Ctrl+P` to pin, `Delete` to remove).
+- Global sequence hotkey engine: `Ctrl+V+Z` (sequential: hold `Ctrl`, press `V` then `Z` within 750ms) using native low-level keyboard hook (`WH_KEYBOARD_LL` on Windows) and X11 sequence grabber on Linux.
+- Accidental paste and undo prevention: keydown and keyup events that complete the sequence are swallowed so the host application never receives an undo (`Ctrl+Z`).
+- Normal `Ctrl+V` (paste) and `Ctrl+Z` (undo) continue working unimpeded when the sequence is not completed or times out. Traditional chord fallback (`Ctrl+Shift+V`) is fully supported.
+- Dedicated frameless, always-on-top floating clipboard popup window with full keyboard navigation (`ArrowUp`/`ArrowDown`, `Enter` to paste, `Shift+Enter` for copy-only, `Esc` to close, `Home`/`End`, `Alt+1`..`Alt+9`, `Ctrl+P` to pin, `Delete` to remove).
+- Configurable `pasteOnSelect` preference: easily toggle between automatic paste injection and copy-to-clipboard on selection.
 - Active window focus preservation and restoration (`GetForegroundWindow`, `AttachThreadInput`, `SetForegroundWindow` on Windows; `_NET_ACTIVE_WINDOW` on X11).
 - Synthetic instant paste key injection (`SendInput` `Ctrl+V` on Windows; XTest / xdotool on Linux with graceful fallback).
 - Internal sequence paste guard and rapid burst debouncing to avoid self-capture loops when pasting history items back into active applications.
+- Restart-safe media storage: relative canonical paths with automatic migration fallback and missing thumbnail auto-regeneration.
 - Full-text search and content-type filtering within the floating popup and main history interface.
 
 ### Settings and storage
