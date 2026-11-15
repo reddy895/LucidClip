@@ -42,7 +42,9 @@ pub fn add_clipboard_entry(
 }
 
 #[tauri::command]
-pub fn copy_clipboard_entry(content: String) -> Result<bool> {
+pub fn copy_clipboard_entry(content: String, state: tauri::State<'_, AppState>) -> Result<bool> {
+    let hash = crate::clipboard::hash_content(&content);
+    state.paste_guard.mark_internal(&hash);
     crate::platform::set_clipboard_text(&content)?;
     Ok(true)
 }
@@ -63,6 +65,7 @@ pub fn copy_clipboard_entry_by_id(id: String, state: tauri::State<'_, AppState>)
                 .paths
                 .resolve_media_file(std::path::Path::new(path_str))?;
             let image = image::open(&path)?.to_rgba8();
+            state.paste_guard.mark_internal(&entry.content_hash);
             crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
         }
         "files" => {
@@ -75,7 +78,11 @@ pub fn copy_clipboard_entry_by_id(id: String, state: tauri::State<'_, AppState>)
                 .collect();
             crate::platform::set_clipboard_files(&files)?;
         }
-        _ => crate::platform::set_clipboard_text(&entry.content)?,
+        _ => {
+            let hash = crate::clipboard::hash_content(&entry.content);
+            state.paste_guard.mark_internal(&hash);
+            crate::platform::set_clipboard_text(&entry.content)?;
+        }
     }
 
     Ok(true)
@@ -328,6 +335,13 @@ pub fn copy_screenshot_image(id: String, state: tauri::State<'_, AppState>) -> R
     let original = service.original_file(&id)?;
 
     let image = image::open(original)?.to_rgba8();
+    let captured = crate::platform::CapturedImage {
+        width: image.width(),
+        height: image.height(),
+        rgba: image.as_raw().clone(),
+    };
+    let hash = crate::clipboard::media::hash_image(&captured);
+    state.paste_guard.mark_internal(&hash);
     crate::platform::set_clipboard_image(image.as_raw(), image.width(), image.height())?;
 
     Ok(true)
