@@ -432,7 +432,8 @@ fn remove_owned_file(paths: &AppPaths, candidate: &str, label: &str) {
         );
         return;
     }
-    remove_file_if_exists(path);
+    let normalized = paths.normalize_media_path(path);
+    remove_file_if_exists(&normalized);
 }
 
 fn validate_crop_region(
