@@ -9,6 +9,46 @@ use crate::platform::hotkeys::ShortcutKey;
 pub const LUCIDCLIP_HOTKEY_ID: i32 = 0x4C43; // 'LC' in hex
 
 #[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+    HHOOK, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+};
+
+#[cfg(target_os = "windows")]
+pub struct WindowsLowLevelHook {
+    hook: HHOOK,
+}
+
+#[cfg(target_os = "windows")]
+impl WindowsLowLevelHook {
+    pub fn install(proc: unsafe extern "system" fn(i32, usize, isize) -> isize) -> Result<Self> {
+        let hook = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc), std::ptr::null_mut(), 0) };
+        if hook.is_null() {
+            let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+            return Err(AppError::GlobalShortcut(format!(
+                "Failed to install WH_KEYBOARD_LL low-level hook (Error {err})"
+            )));
+        }
+        Ok(Self { hook })
+    }
+
+    pub fn handle(&self) -> HHOOK {
+        self.hook
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WindowsLowLevelHook {
+    fn drop(&mut self) {
+        if !self.hook.is_null() {
+            unsafe {
+                UnhookWindowsHookEx(self.hook);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
 pub fn register_hotkey(id: i32, key: &ShortcutKey) -> Result<()> {
     use windows_sys::Win32::Foundation::GetLastError;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
