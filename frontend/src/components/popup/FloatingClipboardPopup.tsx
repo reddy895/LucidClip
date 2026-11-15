@@ -8,7 +8,7 @@ import { PopupFooter } from './PopupFooter';
 import { PopupEmptyState } from './PopupEmptyState';
 import { usePopupKeyboardNavigation } from '@/hooks/usePopupKeyboardNavigation';
 import { usePopupShortcuts } from '@/hooks/usePopupShortcuts';
-import { pasteService } from '@/services';
+import { pasteService, settingsService, clipboardService } from '@/services';
 
 export interface FloatingClipboardPopupProps {
   onPasteAction?: (entry: ClipboardEntry) => void;
@@ -20,7 +20,21 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
   const { clipboardItems, monitorStatus, togglePin, deleteItem, clearClipboardHistory, isLoading } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PopupFilterType>('all');
+  const [pasteOnSelect, setPasteOnSelect] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Load user settings preference for paste-on-select vs copy-only
+  React.useEffect(() => {
+    let active = true;
+    settingsService.getSettings().then((settings) => {
+      if (active && settings?.clipboard?.pasteOnSelect !== undefined) {
+        setPasteOnSelect(Boolean(settings.clipboard.pasteOnSelect));
+      }
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Compute category counts
   const counts = useMemo(() => {
@@ -94,7 +108,7 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
 
   const { selectedIndex, setSelectedIndex, handleKeyDown } = usePopupKeyboardNavigation({
     items: filteredItems,
-    onSelectAndPaste: handlePaste,
+    onSelectAndPaste: (entry) => handleSelectAction(entry, false),
   });
 
   const handleClose = useCallback(() => {
@@ -104,6 +118,31 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
       });
     }
   }, []);
+
+  const handleCopyOnly = useCallback(
+    async (entry: ClipboardEntry) => {
+      try {
+        await clipboardService.copyEntryById(entry.id);
+      } catch {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(entry.content).catch(() => {});
+        }
+      }
+      handleClose();
+    },
+    [handleClose]
+  );
+
+  const handleSelectAction = useCallback(
+    async (entry: ClipboardEntry, forceCopyOnly = false) => {
+      if (forceCopyOnly || !pasteOnSelect) {
+        await handleCopyOnly(entry);
+      } else {
+        await handlePaste(entry);
+      }
+    },
+    [handleCopyOnly, handlePaste, pasteOnSelect]
+  );
 
   const handleTogglePinSelected = useCallback(() => {
     const selected = filteredItems[selectedIndex];
@@ -162,7 +201,7 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
           items={filteredItems}
           selectedIndex={selectedIndex}
           onSelect={setSelectedIndex}
-          onPaste={handlePaste}
+          onPaste={(item) => handleSelectAction(item, false)}
           onTogglePin={(item) => togglePin({ kind: 'clipboard', ...item })}
           onDelete={(item) => deleteItem({ kind: 'clipboard', ...item })}
         />
