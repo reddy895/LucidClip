@@ -143,17 +143,23 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
           </span>
 
           {entry.contentType === 'image' ? (
-            <div className="rounded-btn border border-graphite-border bg-[#151719] p-2">
-              {imageState === 'ready' && imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="Clipboard preview"
-                  className="mx-auto max-h-[420px] max-w-full rounded-[3px] object-contain"
-                  onError={() => {
-                    setImageUrl(undefined);
-                    setImageState('error');
-                  }}
-                />
+            <div className="rounded-btn border border-graphite-border bg-[#151719] p-3 flex flex-col items-center">
+              {imageState === 'ready' && typeof imageUrl === 'string' && imageUrl.startsWith('data:') ? (
+                <div className="relative group w-full flex flex-col items-center">
+                  <img
+                    src={imageUrl}
+                    alt="Clipboard preview"
+                    className="mx-auto max-h-[420px] max-w-full rounded-[3px] object-contain shadow-md"
+                    onError={() => {
+                      setImageUrl(undefined);
+                      setImageState('error');
+                    }}
+                  />
+                  <div className="mt-2 text-[11px] text-[#A1A7B0] flex items-center gap-3">
+                    <span>{entry.imageWidth && entry.imageHeight ? `${entry.imageWidth} × ${entry.imageHeight} px` : 'Clipboard image'}</span>
+                    {entry.byteSize ? <span>{(entry.byteSize / 1024).toFixed(1)} KB</span> : null}
+                  </div>
+                </div>
               ) : imageState === 'loading' ? (
                 <div className="flex min-h-[160px] items-center justify-center gap-2 text-xs text-graphite-text-muted">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -161,9 +167,9 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
                 </div>
               ) : (
                 <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 p-4 text-center text-graphite-text-muted">
-                  <ImageOff className="h-5 w-5" />
-                  <p className="text-xs text-status-error">
-                    The stored image file is unavailable.
+                  <ImageOff className="h-5 w-5 text-amber-500" />
+                  <p className="text-xs text-graphite-text-secondary">
+                    The stored image file is unavailable or corrupted.
                   </p>
                 </div>
               )}
