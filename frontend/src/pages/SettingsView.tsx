@@ -493,8 +493,27 @@ export const SettingsView: React.FC = () => {
                     </div>
                   </div>
                   <kbd className="rounded-btn bg-graphite-surface px-2.5 py-1 text-xs font-mono text-[#8B9CF7] border border-[#8B9CF7]/40 shadow-sm font-semibold">
-                    {settings.shortcuts.historyPopup || 'Ctrl+Shift+V'}
+                    {settings.shortcuts.historyPopup || 'Ctrl+V+Z'}
                   </kbd>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-t border-graphite-border/40 pt-2">
+                  <div>
+                    <div className="text-xs font-medium text-graphite-text-primary">
+                      Paste on Select (Enter)
+                    </div>
+                    <div className="text-[11px] text-graphite-text-muted">
+                      Automatically inject content into the target application when pressing Enter. When disabled, item is copied to clipboard without pasting.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={settings.clipboard.pasteOnSelect ?? true}
+                    onChange={(checked) =>
+                      updateSettings({
+                        clipboard: { ...settings.clipboard, pasteOnSelect: checked },
+                      })
+                    }
+                  />
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-t border-graphite-border/40 pt-2">
