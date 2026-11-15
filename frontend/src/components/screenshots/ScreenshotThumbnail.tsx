@@ -71,7 +71,7 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
     >
       {/* Thumbnail Aspect Box */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#151719]">
-        {thumbnailState === 'ready' && thumbnailUrl ? (
+        {thumbnailState === 'ready' && typeof thumbnailUrl === 'string' && thumbnailUrl.startsWith('data:') ? (
           <img
             src={thumbnailUrl}
             alt={`${item.source === 'screenshot' ? 'Screenshot' : 'Clipboard image'} from ${item.createdAt}`}

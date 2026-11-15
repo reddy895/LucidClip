@@ -117,7 +117,7 @@ export const ScreenshotPreview: React.FC<ScreenshotPreviewProps> = ({ screenshot
       {/* Main Image Container */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
         <div className="relative group rounded-btn overflow-hidden border border-graphite-border bg-[#151719]">
-          {imageState === 'ready' && fullImageUrl ? (
+          {imageState === 'ready' && typeof fullImageUrl === 'string' && fullImageUrl.startsWith('data:') ? (
             <>
               <img
                 src={fullImageUrl}
