@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { ClipboardEntry, ClipboardContentType } from '@/types';
+import { useMediaImageUrl } from '@/hooks';
 
 export interface PopupHistoryRowProps {
   entry: ClipboardEntry;
@@ -64,6 +65,12 @@ export const PopupHistoryRow = React.memo<PopupHistoryRowProps>(({
   onTogglePin,
 }) => {
   const relativeTime = formatRelativeTime(entry.createdAt);
+  const clipboardImage = useMediaImageUrl(
+    'clipboard',
+    entry.id,
+    'thumbnail',
+    entry.contentType === 'image'
+  );
 
   return (
     <div
@@ -108,14 +115,25 @@ export const PopupHistoryRow = React.memo<PopupHistoryRowProps>(({
             ) : null}
           </div>
 
-          {entry.contentType === 'image' && (entry.thumbnailUrl || entry.imageUrl) ? (
+          {entry.contentType === 'image' ? (
             <div className="mt-1 flex items-center gap-2">
-              <img
-                src={entry.thumbnailUrl || entry.imageUrl}
-                alt="Clipboard media"
-                className="w-12 h-8 object-cover rounded border border-[#30363D] bg-black/40"
-              />
-              <span className="text-xs text-[#A1A7B0]">
+              {clipboardImage.state === 'ready' && clipboardImage.url ? (
+                <img
+                  src={clipboardImage.url}
+                  alt="Clipboard media thumbnail"
+                  className="w-12 h-8 object-cover rounded border border-[#30363D] bg-black/40"
+                  loading="lazy"
+                />
+              ) : clipboardImage.state === 'loading' ? (
+                <div className="w-12 h-8 rounded border border-[#30363D] bg-[#151719] flex items-center justify-center animate-pulse">
+                  <ImageIcon className="w-3.5 h-3.5 text-[#6B7280]" />
+                </div>
+              ) : (
+                <div className="w-12 h-8 rounded border border-[#30363D] bg-[#151719] flex items-center justify-center">
+                  <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+                </div>
+              )}
+              <span className="text-xs text-[#A1A7B0] font-mono">
                 {entry.imageWidth && entry.imageHeight
                   ? `${entry.imageWidth} × ${entry.imageHeight} px`
                   : 'Image'}
