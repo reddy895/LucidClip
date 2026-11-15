@@ -1,6 +1,14 @@
 export type OcrStatus = 'none' | 'pending' | 'completed' | 'failed';
 export type CaptureType = 'fullscreen' | 'region';
 export type ImageVariant = 'thumbnail' | 'original';
+export type MediaType = 'clipboard' | 'screenshot';
+
+export interface ImageLoadResult {
+  url: string;
+  variant: ImageVariant;
+  mediaType: MediaType;
+  id: string;
+}
 
 export interface ScreenshotRegion {
   x: number;
