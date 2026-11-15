@@ -215,7 +215,14 @@ impl GlobalShortcutService {
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                self.state.set_active(raw, false, Some(err_msg.clone()));
+                let prev_shortcut = self
+                    .state
+                    .current_shortcut
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.clone())
+                    .unwrap_or_else(|| DEFAULT_HISTORY_SHORTCUT.to_string());
+                self.state.set_active(&prev_shortcut, false, Some(err_msg));
                 Err(e)
             }
         }

@@ -24,6 +24,7 @@ import './test/popup-keyboard-navigation.test.mjs';
 import './test/popup-filtering.test.mjs';
 import './test/image-payload-unpacking.test.mjs';
 import './test/popup-image-rendering.test.mjs';
+import './test/popup-paste-action.test.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

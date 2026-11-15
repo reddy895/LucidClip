@@ -9,7 +9,7 @@ fn test_global_shortcut_service_initial_state() {
     assert!(!service.listener_stop.load(Ordering::SeqCst));
 
     let status = service.status();
-    assert_eq!(status.shortcut, "Ctrl+Shift+V");
+    assert_eq!(status.shortcut, "Ctrl+V+Z");
     assert!(!status.active);
     assert!(status.error.is_none());
 }
