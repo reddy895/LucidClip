@@ -2,7 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { IScreenshotService } from '../contracts';
-import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion } from '@/types';
+import { CaptureType, ImageVariant, ScreenshotEntry, ScreenshotRegion, unpackImageDataUrl } from '@/types';
 
 interface DbScreenshotDto {
   id: string;
@@ -73,10 +73,12 @@ export class TauriScreenshotService implements IScreenshotService {
     const cached = imageCache.get(key);
     if (cached) return cached;
 
-    const request = invoke<string>('get_screenshot_image', { id, variant }).catch((err) => {
-      imageCache.delete(key);
-      throw err;
-    });
+    const request = invoke<string | { data_url?: string; dataUrl?: string; mime_type?: string }>('get_screenshot_image', { id, variant })
+      .then((res) => unpackImageDataUrl(res))
+      .catch((err) => {
+        imageCache.delete(key);
+        throw err;
+      });
     imageCache.set(key, request);
     return request;
   }
