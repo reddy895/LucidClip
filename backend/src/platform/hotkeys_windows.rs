@@ -18,6 +18,28 @@ pub const VK_RCONTROL: u32 = 0xA3;
 pub const VK_V: u32 = 0x56;
 pub const VK_Z: u32 = 0x5A;
 
+use std::sync::atomic::{AtomicIsize, Ordering};
+
+static LAST_FOREGROUND_WINDOW: AtomicIsize = AtomicIsize::new(0);
+
+#[cfg(target_os = "windows")]
+pub fn capture_foreground_window() -> isize {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    let hwnd = unsafe { GetForegroundWindow() };
+    let handle = hwnd as isize;
+    LAST_FOREGROUND_WINDOW.store(handle, Ordering::SeqCst);
+    handle
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn capture_foreground_window() -> isize {
+    0
+}
+
+pub fn get_last_foreground_window() -> isize {
+    LAST_FOREGROUND_WINDOW.load(Ordering::SeqCst)
+}
+
 /// Check if a given Windows virtual key code is any Ctrl key.
 pub fn is_ctrl_vk(vk: u32) -> bool {
     vk == VK_CONTROL || vk == VK_LCONTROL || vk == VK_RCONTROL
@@ -110,6 +132,7 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: usize, lpar
                 if is_keydown {
                     let res = ctx.detector.on_key_down(ch);
                     if res == SequenceEventResult::TriggerSequence {
+                        capture_foreground_window();
                         (ctx.on_triggered)();
                         // Swallow the trigger key so it doesn't cause an undo (Ctrl+Z) in the focused app
                         return 1;
