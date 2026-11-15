@@ -28,6 +28,7 @@ pub fn hash_image(image: &CapturedImage) -> String {
     hasher.update(b"lucidclip-image\0");
     hasher.update(image.width.to_le_bytes());
     hasher.update(image.height.to_le_bytes());
+    hasher.update((image.rgba.len() as u64).to_le_bytes());
     hasher.update(&image.rgba);
     format!("{:x}", hasher.finalize())
 }
