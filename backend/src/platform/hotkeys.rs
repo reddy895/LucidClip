@@ -8,8 +8,11 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use crate::errors::{AppError, Result};
 
-/// Canonical default shortcut for opening the LucidClip floating history popup.
-pub const DEFAULT_HISTORY_SHORTCUT: &str = "Ctrl+Shift+V";
+/// Canonical default sequence shortcut for opening the LucidClip floating history popup.
+pub const DEFAULT_HISTORY_SHORTCUT: &str = "Ctrl+V+Z";
+
+/// Fallback chord shortcut.
+pub const FALLBACK_HISTORY_SHORTCUT: &str = "Ctrl+Shift+V";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ShortcutKey {
@@ -18,10 +21,17 @@ pub struct ShortcutKey {
     pub alt: bool,
     pub meta: bool,
     pub key: String,
+    #[serde(default)]
+    pub sequence_keys: Vec<String>,
 }
 
 impl ShortcutKey {
-    /// Parse a shortcut specification string such as "Ctrl+Shift+V" or "CommandOrControl+Shift+V".
+    /// Whether this shortcut represents a sequential keystroke (e.g. Ctrl+V+Z).
+    pub fn is_sequence(&self) -> bool {
+        self.sequence_keys.len() > 1
+    }
+
+    /// Parse a shortcut specification string such as "Ctrl+V+Z", "Ctrl+Shift+V", or "CommandOrControl+Shift+V".
     pub fn parse(raw: &str) -> Result<Self> {
         let parts: Vec<&str> = raw.split('+').map(str::trim).collect();
         if parts.is_empty() {
@@ -32,7 +42,7 @@ impl ShortcutKey {
         let mut shift = false;
         let mut alt = false;
         let mut meta = false;
-        let mut key = String::new();
+        let mut sequence_keys = Vec::new();
 
         for part in parts {
             if part.is_empty() {
@@ -45,31 +55,37 @@ impl ShortcutKey {
                 "alt" | "option" => alt = true,
                 "meta" | "cmd" | "command" | "win" | "super" => meta = true,
                 other => {
-                    if !key.is_empty() {
+                    let k = other.to_uppercase();
+                    if sequence_keys.len() >= 2 {
                         return Err(AppError::InvalidInput(format!(
-                            "Shortcut cannot define multiple primary keys: '{key}' and '{other}'"
+                            "Shortcut cannot define more than two sequence keys: {:?}",
+                            sequence_keys
                         )));
                     }
-                    key = other.to_uppercase();
+                    sequence_keys.push(k);
                 }
             }
         }
 
-        if key.is_empty() {
+        if sequence_keys.is_empty() {
             return Err(AppError::InvalidInput("Shortcut must specify a primary key".into()));
         }
 
-        let is_valid_key = (key.len() == 1 && key.chars().next().unwrap().is_ascii_alphanumeric())
-            || matches!(
-                key.as_str(),
-                "SPACE" | "TAB" | "ENTER" | "ESCAPE" | "INSERT" | "DELETE" | "HOME" | "END"
-                    | "PAGEUP" | "PAGEDOWN" | "UP" | "DOWN" | "LEFT" | "RIGHT"
-                    | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
-            );
+        for k in &sequence_keys {
+            let is_valid = (k.len() == 1 && k.chars().next().unwrap().is_ascii_alphanumeric())
+                || matches!(
+                    k.as_str(),
+                    "SPACE" | "TAB" | "ENTER" | "ESCAPE" | "INSERT" | "DELETE" | "HOME" | "END"
+                        | "PAGEUP" | "PAGEDOWN" | "UP" | "DOWN" | "LEFT" | "RIGHT"
+                        | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
+                );
 
-        if !is_valid_key {
-            return Err(AppError::InvalidInput(format!("Unsupported primary key: '{key}'")));
+            if !is_valid {
+                return Err(AppError::InvalidInput(format!("Unsupported key in shortcut: '{k}'")));
+            }
         }
+
+        let key = sequence_keys.join("+");
 
         Ok(Self {
             ctrl,
@@ -77,6 +93,7 @@ impl ShortcutKey {
             alt,
             meta,
             key,
+            sequence_keys,
         })
     }
 
@@ -95,7 +112,13 @@ impl ShortcutKey {
         if self.meta {
             parts.push("Meta");
         }
-        parts.push(&self.key);
+        if !self.sequence_keys.is_empty() {
+            for k in &self.sequence_keys {
+                parts.push(k);
+            }
+        } else {
+            parts.push(&self.key);
+        }
         parts.join("+")
     }
 }
