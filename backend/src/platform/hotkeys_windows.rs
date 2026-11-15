@@ -104,6 +104,9 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: usize, lpar
                     ctx.detector.on_ctrl_up();
                 }
             } else if let Some(ch) = vk_to_char(vk) {
+                // Ensure expired sequence states are reset so late keys pass through normally
+                ctx.detector.check_timeout();
+
                 if is_keydown {
                     let res = ctx.detector.on_key_down(ch);
                     if res == SequenceEventResult::TriggerSequence {
@@ -111,6 +114,9 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: usize, lpar
                         // Swallow the trigger key so it doesn't cause an undo (Ctrl+Z) in the focused app
                         return 1;
                     }
+                    // For PassThrough, AwaitingSequence, or Reset, we intentionally fall through
+                    // to CallNextHookEx below so standard keyboard functionality (e.g. normal Ctrl+V paste)
+                    // is preserved in full fidelity without blocking host input.
                 } else if is_keyup && ctx.detector.should_suppress_key_up(ch) {
                     // Swallow the keyup of the sequence key to avoid ghost key events
                     return 1;
