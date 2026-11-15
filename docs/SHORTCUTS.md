@@ -10,12 +10,26 @@ Global shortcuts function across the entire operating system, regardless of whet
 
 | Shortcut | Action | Scope | Description |
 | :--- | :--- | :--- | :--- |
-| **`Ctrl+Shift+V`** | **Toggle Clipboard Popup** | System-Wide | Opens or dismisses the frameless floating clipboard popup at screen center or cursor position. Preserves target window focus. |
+| **`Ctrl+V+Z`** | **Toggle Clipboard Popup** | System-Wide | **Primary Sequence Shortcut:** Press `Ctrl+V` followed by `Ctrl+Z` while `Ctrl` remains held. Opens or dismisses the frameless floating clipboard popup at screen center. |
+| **`Ctrl+Shift+V`** | **Toggle Popup (Chord Fallback)** | System-Wide | Configurable simultaneous chord alternative. |
 | **`Ctrl+Shift+S`** | **Full Screen Capture** | System-Wide | Triggers immediate full-screen desktop capture and registers it in the Screenshot Gallery. |
 | **`Ctrl+Shift+A`** | **Area Region Capture** | System-Wide | Launches the interactive screen selection overlay for cropped capture. |
 
+### The `Ctrl+V+Z` Sequence State Machine
+
+To prevent interference with daily typing while supporting high-speed muscle memory:
+1. **Holding `Ctrl`:** State machine enters `CtrlHeld`.
+2. **Pressing `V`:** State machine transitions to `AwaitingZ { timestamp }`.
+3. **Pressing `Z` within 750ms:**
+   - Sequence is recognized!
+   - Key event is swallowed to prevent accidental undo or paste.
+   - Floating clipboard history popup appears immediately over the current foreground application.
+4. **Timeout / Interruption:**
+   - If `Ctrl` is released, or another key is pressed, or 750ms elapses without `Z`, the state machine resets cleanly.
+   - Normal `Ctrl+V` (paste) and `Ctrl+Z` (undo) continue operating unimpeded.
+
 > [!NOTE]
-> Global hotkey combinations can be customized in **Settings > Hotkeys**. If another application registers `Ctrl+Shift+V` first, LucidClip detects the registration error, logs diagnostic details, and retains fallback accessibility.
+> Global hotkey combinations can be configured in **Settings > Hotkeys**. Sequence mode and timeout thresholds (default 750ms) are adjustable to match individual typing speed.
 
 ---
 
