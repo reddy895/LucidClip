@@ -207,10 +207,18 @@ impl GlobalShortcutService {
     }
 
     pub fn update_shortcut(&self, raw: &str) -> Result<GlobalShortcutStatus> {
-        let key = probe_shortcut_availability(raw)?;
-        let canonical = key.canonical();
-        self.state.set_active(&canonical, true, None);
-        Ok(self.status())
+        match probe_shortcut_availability(raw) {
+            Ok(key) => {
+                let canonical = key.canonical();
+                self.state.set_active(&canonical, true, None);
+                Ok(self.status())
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                self.state.set_active(raw, false, Some(err_msg.clone()));
+                Err(e)
+            }
+        }
     }
 }
 
@@ -255,7 +263,7 @@ mod tests {
     fn test_shortcut_parsing_errors() {
         assert!(ShortcutKey::parse("").is_err());
         assert!(ShortcutKey::parse("Ctrl+Shift").is_err());
-        assert!(ShortcutKey::parse("Ctrl+A+B").is_err());
+        assert!(ShortcutKey::parse("Ctrl+A+B+C").is_err()); // More than two sequence keys
     }
 
     #[test]
