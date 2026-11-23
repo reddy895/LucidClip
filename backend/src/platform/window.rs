@@ -13,7 +13,12 @@ pub fn foreground_process_name() -> Result<Option<String>> {
         windows_window::foreground_process_name()
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        linux_window::foreground_process_name()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         Ok(None)
     }
@@ -87,6 +92,11 @@ mod linux_window {
             ClipboardSession::X11 => true,
             ClipboardSession::Wayland | ClipboardSession::Unsupported => false,
         }
+    }
+
+    pub fn foreground_process_name() -> Result<Option<String>> {
+        let target = capture_foreground_target()?;
+        Ok(target.and_then(|t| t.process_name))
     }
 
     pub fn capture_foreground_target() -> Result<Option<ActiveWindowTarget>> {

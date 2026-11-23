@@ -250,7 +250,7 @@ fn capture_clipboard_once(
     }
 
     match platform::read_clipboard_snapshot() {
-        Ok(Some(ClipboardSnapshot::Text(text))) if !text.trim().is_empty() => {
+        Ok(Some(ClipboardSnapshot::Text(text))) if !text.is_empty() => {
             if text.chars().count() > MAX_CAPTURE_CHARS {
                 eprintln!(
                     "[LucidClip Monitor] Skipped clipboard content larger than {MAX_CAPTURE_CHARS} characters."
@@ -586,6 +586,11 @@ pub fn spawn(
             state.last_error = first;
         });
         emit_status(&app, &status);
+        return;
+    }
+
+    if status_snapshot(&status).running {
+        eprintln!("[LucidClip Monitor] Monitor worker thread is already running; skipping redundant spawn.");
         return;
     }
 
