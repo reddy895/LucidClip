@@ -26,7 +26,7 @@ export const ScreenshotThumbnail: React.FC<ScreenshotThumbnailProps> = ({
   useEffect(() => {
     let active = true;
 
-    if (!item.thumbnailAvailable) {
+    if (item.thumbnailAvailable === false && item.originalAvailable === false) {
       setThumbnailUrl(undefined);
       setThumbnailState('error');
       return () => {

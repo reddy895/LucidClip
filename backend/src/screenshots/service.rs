@@ -278,19 +278,28 @@ impl<'a> ScreenshotService<'a> {
 
         let path = match variant {
             ScreenshotVariant::Thumbnail => self.ensure_thumbnail(&entry)?,
-            ScreenshotVariant::Original => self
-                .paths
-                .resolve_media_file(Path::new(&entry.original_path))?,
+            ScreenshotVariant::Original => {
+                let candidate = if entry.original_path.trim().is_empty() {
+                    self.paths.originals_dir.join(format!("{}.png", entry.id))
+                } else {
+                    PathBuf::from(&entry.original_path)
+                };
+                self.paths.resolve_media_file(&candidate)?
+            }
         };
 
         image_data_url(&path)
     }
 
     fn ensure_thumbnail(&self, entry: &DbScreenshotEntry) -> Result<PathBuf> {
-        let candidate = Path::new(&entry.thumbnail_path);
-        self.paths.validate_media_path(candidate)?;
+        let candidate = if entry.thumbnail_path.trim().is_empty() {
+            self.paths.thumbnails_dir.join(format!("{}.png", entry.id))
+        } else {
+            PathBuf::from(&entry.thumbnail_path)
+        };
+        self.paths.validate_media_path(&candidate)?;
 
-        if let Ok(existing) = self.paths.resolve_media_file(candidate) {
+        if let Ok(existing) = self.paths.resolve_media_file(&candidate) {
             if let Ok(meta) = fs::metadata(&existing) {
                 if meta.len() > 0 {
                     return Ok(existing);
@@ -298,12 +307,15 @@ impl<'a> ScreenshotService<'a> {
             }
         }
 
-        let original = self
-            .paths
-            .resolve_media_file(Path::new(&entry.original_path))?;
+        let original_candidate = if entry.original_path.trim().is_empty() {
+            self.paths.originals_dir.join(format!("{}.png", entry.id))
+        } else {
+            PathBuf::from(&entry.original_path)
+        };
+        let original = self.paths.resolve_media_file(&original_candidate)?;
         let source = image::open(&original)?;
         let thumbnail = source.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
-        let target_path = self.paths.normalize_media_path(candidate);
+        let target_path = self.paths.normalize_media_path(&candidate);
 
         if let Some(parent) = target_path.parent() {
             fs::create_dir_all(parent).map_err(|err| {

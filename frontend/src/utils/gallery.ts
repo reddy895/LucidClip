@@ -31,7 +31,7 @@ export function buildGalleryItems(
     isPinned: entry.isPinned,
     isFavorite: entry.isFavorite,
     captureType: 'clipboard',
-    thumbnailAvailable: !!entry.thumbnailPath,
+    thumbnailAvailable: !!(entry.thumbnailPath || entry.imagePath),
     originalAvailable: !!entry.imagePath,
   }));
 

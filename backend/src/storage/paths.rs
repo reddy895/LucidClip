@@ -107,6 +107,12 @@ impl AppPaths {
             if in_thumb.is_file() {
                 return in_thumb;
             }
+            if path.components().any(|c| c.as_os_str() == "originals") {
+                return in_orig;
+            }
+            if path.components().any(|c| c.as_os_str() == "thumbnails") {
+                return in_thumb;
+            }
         }
 
         path.to_path_buf()

@@ -1,7 +1,7 @@
 //! Tauri IPC Command Handlers
 
 use crate::clipboard::{media, ClipboardService};
-use crate::database::{DbClipboardEntry, DbScreenshotEntry, SettingsRepo};
+use crate::database::{DbClipboardEntry, SettingsRepo};
 use crate::errors::{AppError, Result};
 use crate::screenshots::{
     CaptureMode, CaptureRegion, ScreenshotGalleryEntry, ScreenshotImageData, ScreenshotService,
@@ -284,7 +284,7 @@ pub fn capture_screenshot(
     capture_type: String,
     region: Option<CaptureRegionDto>,
     state: tauri::State<'_, AppState>,
-) -> Result<DbScreenshotEntry> {
+) -> Result<ScreenshotGalleryEntry> {
     let mode = match capture_type.as_str() {
         "fullscreen" => CaptureMode::Fullscreen,
         "region" => {
@@ -306,7 +306,12 @@ pub fn capture_screenshot(
     };
 
     let service = ScreenshotService::new(&state.pool, &state.paths);
-    service.capture(mode)
+    let entry = service.capture(mode)?;
+    Ok(ScreenshotGalleryEntry {
+        entry,
+        thumbnail_available: true,
+        original_available: true,
+    })
 }
 
 #[tauri::command]
@@ -315,9 +320,9 @@ pub fn crop_screenshot(
     region: CaptureRegionDto,
     remove_source: bool,
     state: tauri::State<'_, AppState>,
-) -> Result<DbScreenshotEntry> {
+) -> Result<ScreenshotGalleryEntry> {
     let service = ScreenshotService::new(&state.pool, &state.paths);
-    service.crop(
+    let entry = service.crop(
         &source_id,
         CaptureRegion {
             x: region.x,
@@ -326,7 +331,12 @@ pub fn crop_screenshot(
             height: region.height,
         },
         remove_source,
-    )
+    )?;
+    Ok(ScreenshotGalleryEntry {
+        entry,
+        thumbnail_available: true,
+        original_available: true,
+    })
 }
 
 #[tauri::command]

@@ -85,3 +85,42 @@ fn test_corrupt_empty_original_returns_error() {
 
     let _ = fs::remove_dir_all(temp_root);
 }
+
+#[test]
+fn test_screenshot_service_thumbnail_regeneration_and_preview() {
+    let temp_root = std::env::temp_dir().join(format!("lucidclip_shot_regen_{}", std::process::id()));
+    let paths = AppPaths::from_root(&temp_root);
+    paths.ensure_dirs_exist().unwrap();
+
+    let pool = lucidclip_lib::database::DbPool::open(&paths.database_path).unwrap();
+    lucidclip_lib::database::run_migrations(&pool).unwrap();
+
+    let service = lucidclip_lib::screenshots::ScreenshotService::new(&pool, &paths);
+    let captured = create_test_captured_image(120, 80);
+    let stored = service.store(captured, "fullscreen", None).expect("Store screenshot");
+
+    // Verify original and thumbnail exist
+    let thumb_path = std::path::PathBuf::from(&stored.thumbnail_path);
+    assert!(thumb_path.exists());
+
+    // Delete thumbnail to simulate missing thumbnail
+    fs::remove_file(&thumb_path).unwrap();
+    assert!(!thumb_path.exists());
+
+    // load_image(Thumbnail) should automatically recreate the thumbnail and return data URL
+    let thumb_data = service.load_image(&stored.id, lucidclip_lib::screenshots::ScreenshotVariant::Thumbnail)
+        .expect("Re-generate and return thumbnail");
+    assert!(thumb_data.is_valid());
+    assert_eq!(thumb_data.mime_type, "image/png");
+    assert!(thumb_data.data_url.starts_with("data:image/png;base64,"));
+    assert!(thumb_path.exists());
+
+    // load_image(Original) should return full image data URL for preview
+    let orig_data = service.load_image(&stored.id, lucidclip_lib::screenshots::ScreenshotVariant::Original)
+        .expect("Load original full size preview");
+    assert!(orig_data.is_valid());
+    assert_eq!(orig_data.mime_type, "image/png");
+    assert!(orig_data.data_url.starts_with("data:image/png;base64,"));
+
+    let _ = fs::remove_dir_all(temp_root);
+}
