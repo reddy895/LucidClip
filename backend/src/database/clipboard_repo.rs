@@ -61,7 +61,10 @@ impl<'a> ClipboardRepo<'a> {
         self.pool.with_conn(|conn| {
             conn.execute(
                 "INSERT INTO clipboard_entries (id, content, content_type, source_app, created_at, content_hash, pinned, favorite, image_path, thumbnail_path, image_width, image_height, byte_size, file_count, last_used_at, usage_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                 ON CONFLICT(content_hash) DO UPDATE SET
+                    created_at = excluded.created_at,
+                    last_used_at = excluded.created_at",
                 params![
                     entry.id,
                     entry.content,

@@ -12,6 +12,10 @@ pub struct DbPool {
 impl DbPool {
     /// Open SQLite database at the specified path and apply optimal desktop PRAGMAs
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if let Some(parent) = path.as_ref().parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+
         let conn = Connection::open(path)?;
 
         // Configure SQLite performance and concurrency settings
