@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 
 describe('Floating Clipboard Popup Filtering and Pinning Tests', () => {
   const entries = [
-    { id: '1', content: 'SELECT * FROM users;', contentType: 'code', sourceApp: 'DataGrip', isPinned: true },
-    { id: '2', content: 'https://linear.app/issue/12', contentType: 'url', sourceApp: 'Chrome', isPinned: false },
-    { id: '3', content: 'meeting notes summary', contentType: 'text', sourceApp: 'Notion', isPinned: false },
-    { id: '4', content: '', contentType: 'image', sourceApp: 'SnippingTool', isPinned: true },
-    { id: '5', content: '/var/log/syslog', contentType: 'files', sourceApp: 'Terminal', isPinned: false },
+    { id: '1', content: 'SELECT * FROM users;', contentType: 'code', sourceApp: 'DataGrip', isPinned: true, createdAt: '2026-11-20T10:00:00Z' },
+    { id: '2', content: 'https://linear.app/issue/12', contentType: 'url', sourceApp: 'Chrome', isPinned: false, createdAt: '2026-11-21T10:00:00Z' },
+    { id: '3', content: 'meeting notes summary', contentType: 'text', sourceApp: 'Notion', isPinned: false, createdAt: '2026-11-22T10:00:00Z' },
+    { id: '4', content: '', contentType: 'image', sourceApp: 'SnippingTool', isPinned: true, createdAt: '2026-11-23T08:00:00Z' },
+    { id: '5', content: '/var/log/syslog', contentType: 'files', sourceApp: 'Terminal', isPinned: false, createdAt: '2026-11-23T09:00:00Z' },
   ];
 
   function filterEntries(items, activeFilter, searchQuery) {
@@ -24,14 +24,16 @@ describe('Floating Clipboard Popup Filtering and Pinning Tests', () => {
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      res = res.filter(
-        (item) =>
-          item.content.toLowerCase().includes(q) ||
-          item.contentType.toLowerCase().includes(q) ||
-          (item.sourceApp && item.sourceApp.toLowerCase().includes(q))
-      );
+      const tokens = q.split(/\s+/).filter(Boolean);
+      res = res.filter((item) => {
+        const textToSearch = `${item.content} ${item.contentType} ${item.sourceApp ?? ''}`.toLowerCase();
+        return tokens.every((token) => textToSearch.includes(token));
+      });
     }
-    return res;
+
+    return [...res].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 
   test('Filtering by chip categories isolates expected types', () => {
@@ -61,6 +63,27 @@ describe('Floating Clipboard Popup Filtering and Pinning Tests', () => {
     // Searching 'notion' under pinned should yield empty
     const noResults = filterEntries(entries, 'pinned', 'notion');
     assert.equal(noResults.length, 0);
+  });
+
+  test('Newest-first ordering is preserved across filtering', () => {
+    const all = filterEntries(entries, 'all', '');
+    assert.equal(all[0].id, '5'); // 2026-11-23T09:00:00Z
+    assert.equal(all[1].id, '4'); // 2026-11-23T08:00:00Z
+    assert.equal(all[2].id, '3'); // 2026-11-22
+    assert.equal(all[3].id, '2'); // 2026-11-21
+    assert.equal(all[4].id, '1'); // 2026-11-20
+  });
+
+  test('Multi-token case-insensitive search matches across content and source app', () => {
+    // "datagrip users" matches entry 1
+    const res = filterEntries(entries, 'all', 'datagrip users');
+    assert.equal(res.length, 1);
+    assert.equal(res[0].id, '1');
+
+    // Case-insensitivity check: "CHROME LINEAR"
+    const res2 = filterEntries(entries, 'all', 'CHROME LINEAR');
+    assert.equal(res2.length, 1);
+    assert.equal(res2[0].id, '2');
   });
 
   test('Pin toggle updates item pinned status', () => {

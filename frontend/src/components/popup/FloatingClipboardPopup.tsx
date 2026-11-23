@@ -73,18 +73,20 @@ export const FloatingClipboardPopup: React.FC<FloatingClipboardPopupProps> = ({
       );
     }
 
-    // Filter by search query
+    // Filter by search query (case-insensitive across content, type, and source application)
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      result = result.filter(
-        (item) =>
-          item.content.toLowerCase().includes(q) ||
-          item.contentType.toLowerCase().includes(q) ||
-          item.sourceApp?.toLowerCase().includes(q)
-      );
+      const tokens = q.split(/\s+/).filter(Boolean);
+      result = result.filter((item) => {
+        const textToSearch = `${item.content} ${item.contentType} ${item.sourceApp ?? ''}`.toLowerCase();
+        return tokens.every((token) => textToSearch.includes(token));
+      });
     }
 
-    return result;
+    // Ensure newest-first ordering
+    return [...result].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [clipboardItems, activeFilter, searchQuery]);
 
   const handlePaste = useCallback(
