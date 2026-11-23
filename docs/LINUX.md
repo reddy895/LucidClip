@@ -51,17 +51,19 @@ flowchart TD
 
 ---
 
-## 3. Global Shortcuts (`Ctrl+Shift+V`)
+## 3. Global Shortcuts (`Ctrl+V+Z`, `Ctrl+P`, `Ctrl+Shift+V`)
 
 ### X11 Implementation
-- Uses `XGrabKey` on the root window with modifiers `ControlMask | ShiftMask` and the keysym for `v` / `V`.
+- **Sequence Interception (`Ctrl+V+Z`)**: LucidClip runs a dedicated `SequenceDetector` listening on X11 root window events. Holding `Ctrl` and pressing `V` followed by `Z` within 750ms swallows the final key event and dispatches a popup display message without sending an undo (`Ctrl+Z`) to the active window.
+- **Fast Chord Alternative (`Ctrl+P`)**: Single-chord shortcut directly triggers the popup or quick access overlay without requiring multi-key sequencing.
+- **Chord Grab (`Ctrl+Shift+V`)**: Uses `XGrabKey` on the root window with modifiers `ControlMask | ShiftMask` and the keysym for `v` / `V`.
 - Handles `BadAccess` errors cleanly if another running utility (e.g., terminal emulator) has already grabbed the key combination.
 - Spawns a dedicated event polling thread to intercept `KeyPress` events and dispatch Tauri window events to unhide and center the floating popup.
 
 ### Wayland Implementation
 - Native Wayland compositors prohibit clients from passively snooping on or grabbing global keystrokes across windows.
 - LucidClip queries the Freedesktop Portal `org.freedesktop.portal.GlobalShortcuts` via D-Bus (`libdbus`).
-- When the portal is unavailable or permissions are not granted by the desktop environment, LucidClip logs an actionable diagnostic message in the capability inspector.
+- When the portal is unavailable or permissions are not granted by the desktop environment, LucidClip logs an actionable diagnostic message in the capability inspector. Users can register `lucidclip --popup` directly in GNOME/KDE shortcut settings.
 
 ---
 

@@ -11,6 +11,7 @@ Global shortcuts function across the entire operating system, regardless of whet
 | Shortcut | Action | Scope | Description |
 | :--- | :--- | :--- | :--- |
 | **`Ctrl+V+Z`** | **Toggle Clipboard Popup** | System-Wide | **Primary Sequence Shortcut:** Press `Ctrl+V` followed by `Ctrl+Z` while `Ctrl` remains held. Opens or dismisses the frameless floating clipboard popup at screen center. |
+| **`Ctrl+P`** | **Open Clipboard Popup** | System-Wide & In-App | **Fast Chord Alternative:** Press `Ctrl+P` to immediately popup LucidClip and paste older copied text snippets. |
 | **`Ctrl+Shift+V`** | **Toggle Popup (Chord Fallback)** | System-Wide | Configurable simultaneous chord alternative. |
 | **`Ctrl+Shift+S`** | **Full Screen Capture** | System-Wide | Triggers immediate full-screen desktop capture and registers it in the Screenshot Gallery. |
 | **`Ctrl+Shift+A`** | **Area Region Capture** | System-Wide | Launches the interactive screen selection overlay for cropped capture. |

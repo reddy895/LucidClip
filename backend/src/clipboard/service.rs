@@ -6,7 +6,7 @@ use std::fs;
 use crate::clipboard::classifier::classify_content;
 use crate::clipboard::hasher::{hash_bytes, hash_content};
 use crate::clipboard::media;
-use crate::clipboard::normalize::{canonical_text, normalize_text};
+use crate::clipboard::normalize::normalize_text;
 use crate::database::{ClipboardRepo, DbClipboardEntry, DbPool, SettingsRepo};
 use crate::errors::{AppError, Result};
 use crate::platform::CapturedImage;
@@ -46,7 +46,7 @@ impl<'a> ClipboardService<'a> {
         raw_text: &str,
         source_app: Option<String>,
     ) -> Result<DbClipboardEntry> {
-        if raw_text.is_empty() || canonical_text(raw_text).is_empty() {
+        if raw_text.is_empty() || normalize_text(raw_text).trim().is_empty() {
             return Err(AppError::InvalidInput(
                 "Clipboard text is empty after normalization".into(),
             ));

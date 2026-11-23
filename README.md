@@ -46,9 +46,10 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 ### System-wide clipboard intelligence & instant paste
 
 - Global sequence hotkey engine: `Ctrl+V+Z` (sequential: hold `Ctrl`, press `V` then `Z` within 750ms) using native low-level keyboard hook (`WH_KEYBOARD_LL` on Windows) and X11 sequence grabber on Linux.
+- Fast chord shortcut: `Ctrl+P` opens the floating clipboard popup or in-window quick access instantly from any screen, allowing you to select and paste old copied text in seconds.
 - Accidental paste and undo prevention: keydown and keyup events that complete the sequence are swallowed so the host application never receives an undo (`Ctrl+Z`).
 - Normal `Ctrl+V` (paste) and `Ctrl+Z` (undo) continue working unimpeded when the sequence is not completed or times out. Traditional chord fallback (`Ctrl+Shift+V`) is fully supported.
-- Dedicated frameless, always-on-top floating clipboard popup window with full keyboard navigation (`ArrowUp`/`ArrowDown`, `Enter` to paste, `Shift+Enter` for copy-only, `Esc` to close, `Home`/`End`, `Alt+1`..`Alt+9`, `Ctrl+P` to pin, `Delete` to remove).
+- Dedicated frameless, always-on-top floating clipboard popup window with full keyboard navigation (`ArrowUp`/`ArrowDown` to browse, `Enter` to instant-paste, `Shift+Enter` for copy-only, `Esc` to dismiss, `Home`/`End`, `Alt+1`..`Alt+9`, `Ctrl+P` to pin, `Delete` to remove).
 - Configurable `pasteOnSelect` preference: easily toggle between automatic paste injection and copy-to-clipboard on selection.
 - Active window focus preservation and restoration (`GetForegroundWindow`, `AttachThreadInput`, `SetForegroundWindow` on Windows; `_NET_ACTIVE_WINDOW` on X11).
 - Synthetic instant paste key injection (`SendInput` `Ctrl+V` on Windows; XTest / xdotool on Linux with graceful fallback).
@@ -78,9 +79,40 @@ LucidClip keeps copied text, images, file references, and captured screenshots s
 
 These items are deliberately not presented as working controls.
 
----
+## Linux requirements & display server notes
 
-## Quick start
+LucidClip runs on modern Linux distributions (Ubuntu, Debian, Fedora, Arch) with GTK 3:
+
+### Prerequisites
+
+```bash
+# Ubuntu / Debian
+sudo apt install libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev xdotool
+
+# Fedora
+sudo dnf install gtk3-devel libappindicator-gtk3-devel librsvg2-devel xdotool
+
+# Arch Linux
+sudo pacman -S gtk3 libappindicator-gtk3 librsvg xdotool
+```
+
+### Display Server Differences (X11 vs Wayland)
+
+- **X11 Session**:
+  - Full native clipboard monitoring via GTK `owner-change`.
+  - Global `Ctrl+V+Z` sequence interception and `Ctrl+P` / `Ctrl+Shift+V` chords via root window key grabbing (`XGrabKey`).
+  - Active window focus tracking via `_NET_ACTIVE_WINDOW` and process attribution via `/proc/{pid}/comm`.
+  - Synthetic instant paste key injection via the `XTest` extension and `xdotool`.
+- **Wayland Session**:
+  - GTK `owner-change` clipboard capture works natively without external CLI dependencies.
+  - Security model strictly isolates cross-window key interception from background applications. Global hotkeys cannot be grabbed globally by arbitrary unprivileged apps.
+  - **Recommended Wayland setup**: In GNOME Settings -> Keyboard -> Keyboard Shortcuts (or KDE System Settings -> Shortcuts), create a custom global shortcut (e.g. `Ctrl+P` or `Super+V`) pointing to:
+    ```bash
+    lucidclip --popup
+    ```
+    This invokes LucidClip's popup window with zero security conflicts.
+
+---
 
 Requires Node.js 20+, npm, and the Tauri 2 prerequisites for your platform.
 
