@@ -66,10 +66,18 @@ export function useDesktopShortcuts(): void {
         return;
       }
 
-      // Ctrl/Cmd + P: Toggle preview panel
+      // Ctrl/Cmd + P: Open clipboard popup / quick access
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        togglePreview();
+        if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+          import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('show_clipboard_popup').catch(() => {
+              openQuickAccess();
+            });
+          });
+        } else {
+          openQuickAccess();
+        }
         return;
       }
 

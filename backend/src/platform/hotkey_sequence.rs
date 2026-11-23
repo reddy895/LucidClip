@@ -29,6 +29,7 @@ pub struct SequenceDetector {
     timeout: Duration,
     first_key: char,
     second_key: char,
+    single_key_mode: bool,
     suppress_key_up: bool,
 }
 
@@ -39,6 +40,18 @@ impl SequenceDetector {
             timeout: Duration::from_millis(timeout_ms),
             first_key: first_key.to_ascii_uppercase(),
             second_key: second_key.to_ascii_uppercase(),
+            single_key_mode: false,
+            suppress_key_up: false,
+        }
+    }
+
+    pub fn single_key(key: char) -> Self {
+        Self {
+            state: SequenceState::Idle,
+            timeout: Duration::from_millis(DEFAULT_SEQUENCE_TIMEOUT_MS),
+            first_key: key.to_ascii_uppercase(),
+            second_key: key.to_ascii_uppercase(),
+            single_key_mode: true,
             suppress_key_up: false,
         }
     }
@@ -99,7 +112,11 @@ impl SequenceDetector {
 
         match self.state {
             SequenceState::CtrlDown => {
-                if ch == self.first_key {
+                if self.single_key_mode && ch == self.first_key {
+                    self.state = SequenceState::Triggered;
+                    self.suppress_key_up = true;
+                    SequenceEventResult::TriggerSequence
+                } else if ch == self.first_key {
                     self.state = SequenceState::AwaitingSecondKey {
                         v_pressed_at: Instant::now(),
                     };

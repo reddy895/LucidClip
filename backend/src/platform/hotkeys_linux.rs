@@ -218,10 +218,15 @@ where
     std::thread::Builder::new()
         .name("lucidclip-linux-hotkeys".into())
         .spawn(move || {
-            let first_ch = key.sequence_keys.first().and_then(|k| k.chars().next()).unwrap_or('V');
-            let second_ch = key.sequence_keys.get(1).and_then(|k| k.chars().next()).unwrap_or('Z');
             let on_trigger = on_triggered;
-            let mut detector = SequenceDetector::new(first_ch, second_ch, 750);
+            let mut detector = if key.is_sequence() {
+                let first_ch = key.sequence_keys.first().and_then(|k| k.chars().next()).unwrap_or('V');
+                let second_ch = key.sequence_keys.get(1).and_then(|k| k.chars().next()).unwrap_or('Z');
+                SequenceDetector::new(first_ch, second_ch, 750)
+            } else {
+                let single_ch = key.sequence_keys.first().and_then(|k| k.chars().next()).unwrap_or('P');
+                SequenceDetector::single_key(single_ch)
+            };
 
             // In X11 mode, loop while stop is not requested
             while !stop.load(Ordering::Relaxed) {

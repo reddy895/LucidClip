@@ -94,3 +94,19 @@ fn test_sequence_detector_refreshed_first_key() {
     let res = detector.on_key_down('Z');
     assert_eq!(res, SequenceEventResult::TriggerSequence);
 }
+
+#[test]
+fn test_single_key_mode_ctrl_p() {
+    let mut detector = SequenceDetector::single_key('P');
+    assert_eq!(detector.state(), SequenceState::Idle);
+
+    // Ctrl down
+    detector.on_ctrl_down();
+    assert_eq!(detector.state(), SequenceState::CtrlDown);
+
+    // Press P -> triggers popup immediately
+    let res = detector.on_key_down('p');
+    assert_eq!(res, SequenceEventResult::TriggerSequence);
+    assert_eq!(detector.state(), SequenceState::Triggered);
+    assert!(detector.should_suppress_key_up('p'));
+}
