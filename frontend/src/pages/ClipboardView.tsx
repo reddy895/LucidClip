@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context';
-import { SectionHeader, EmptyState, Badge, Button, SearchInput } from '@/components/ui';
+import { SectionHeader, EmptyState, LoadingState, Badge, Button, SearchInput } from '@/components/ui';
 import { SearchEmptyState, SortDropdown } from '@/components/search';
 import { ClipboardRow, ClipboardToolbar } from '@/components/clipboard';
 import { useListKeyboardNavigation } from '@/hooks';
@@ -15,6 +15,7 @@ export const ClipboardView: React.FC = () => {
     selectedItem,
     setSelectedItem,
     clearClipboardHistory,
+    isLoading,
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -139,7 +140,9 @@ export const ClipboardView: React.FC = () => {
 
       {/* List Feed */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <LoadingState message="Loading text history..." />
+        ) : filtered.length === 0 ? (
           query || selectedType !== 'all' ? (
             <SearchEmptyState />
           ) : (

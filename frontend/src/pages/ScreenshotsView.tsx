@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context';
-import { SectionHeader, EmptyState, Badge, Button, SearchInput } from '@/components/ui';
+import { SectionHeader, EmptyState, LoadingState, Badge, Button, SearchInput } from '@/components/ui';
 import { SearchEmptyState } from '@/components/search';
 import { ScreenshotGrid } from '@/components/screenshots/ScreenshotGrid';
 import { Camera, Crop, Image as ImageIcon } from 'lucide-react';
@@ -13,6 +13,7 @@ export const ScreenshotsView: React.FC = () => {
     clipboardItems,
     captureScreenshot,
     setIsPreviewVisible,
+    isLoading,
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -132,7 +133,9 @@ export const ScreenshotsView: React.FC = () => {
 
       {/* Gallery Grid */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <LoadingState message="Loading screenshot gallery..." />
+        ) : filtered.length === 0 ? (
           query || filterType !== 'all' ? (
             <SearchEmptyState />
           ) : (

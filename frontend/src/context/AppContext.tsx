@@ -248,7 +248,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const reportActionError = (action: string, err: unknown) => {
     console.error(`[LucidClip] ${action} failed`, err);
-    toast.error(`${action} failed. Please try again.`);
+    const detail =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+        ? err
+        : 'Please check application status and try again.';
+    toast.error(`${action} failed: ${detail}`);
   };
 
   const copyItem = async (item: HistoryItem): Promise<boolean> => {

@@ -184,7 +184,11 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ entry }) => {
             <UrlPreview url={entry.content} />
           ) : (
             <div className="rounded-btn bg-[#151719] border border-graphite-border p-3 text-xs leading-relaxed text-[#F3F4F6] font-sans whitespace-pre-wrap break-words selectable-text">
-              {entry.content}
+              {entry.content.trim().length === 0 ? (
+                <span className="text-graphite-text-muted italic">(Empty clipboard content)</span>
+              ) : (
+                entry.content
+              )}
             </div>
           )}
         </div>
