@@ -11,7 +11,7 @@ import {
 import { useApp } from '@/context';
 import { NavigationSection } from '@/types';
 import { SidebarItem } from './SidebarItem';
-import { cn, formatBytes } from '@/utils';
+import { cn, formatBytes, selectTextEntries, selectClipboardImages } from '@/utils';
 import { Tooltip } from '@/components/ui';
 
 export const Sidebar: React.FC = () => {
@@ -25,6 +25,8 @@ export const Sidebar: React.FC = () => {
     storageStats,
   } = useApp();
 
+  const textCount = selectTextEntries(clipboardItems).length;
+  const screenshotCount = screenshotItems.length + selectClipboardImages(clipboardItems).length;
   const pinnedCount = unifiedHistory.filter((i) => i.isPinned).length;
   const favoriteCount = unifiedHistory.filter((i) => i.isFavorite).length;
 
@@ -46,14 +48,14 @@ export const Sidebar: React.FC = () => {
       id: 'clipboard',
       label: 'Text',
       icon: <ClipboardList className="h-4 w-4" />,
-      count: clipboardItems.length,
+      count: textCount,
       shortcut: 'Ctrl+2',
     },
     {
       id: 'screenshots',
       label: 'Screenshots',
       icon: <Camera className="h-4 w-4" />,
-      count: screenshotItems.length,
+      count: screenshotCount,
       shortcut: 'Ctrl+3',
     },
     {
