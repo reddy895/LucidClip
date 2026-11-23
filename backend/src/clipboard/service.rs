@@ -46,7 +46,7 @@ impl<'a> ClipboardService<'a> {
         raw_text: &str,
         source_app: Option<String>,
     ) -> Result<DbClipboardEntry> {
-        if canonical_text(raw_text).trim().is_empty() {
+        if raw_text.is_empty() || canonical_text(raw_text).is_empty() {
             return Err(AppError::InvalidInput(
                 "Clipboard text is empty after normalization".into(),
             ));

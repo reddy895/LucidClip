@@ -9,7 +9,7 @@ static URL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static COLOR_HEX_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#(?:[0-9a-fA-F]{3}){1,2}$").unwrap());
+    LazyLock::new(|| Regex::new(r"^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$").unwrap());
 
 static COLOR_FUNC_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(rgb|rgba|hsl|hsla)\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?(?:\s*,\s*[\d.]+%?\s*)?\)$").unwrap()
@@ -140,6 +140,13 @@ fn is_code_snippet(text: &str) -> bool {
         "<div",
         "console.log",
         "println!",
+        "#!/bin/bash",
+        "#!/bin/sh",
+        "sudo ",
+        "docker run ",
+        "git commit ",
+        "cargo ",
+        "npm run ",
     ];
 
     let has_keyword = code_keywords.iter().any(|&kw| text.contains(kw));
